@@ -1,5 +1,4 @@
-import { Suit } from './suit';
-import { Value } from './value';
+import { Suit, Value } from "."
 
 export class Card {
     private v: Value;
@@ -27,7 +26,7 @@ export class Card {
     }
 
     public get id() {
-        return `${this.v}${this.s}`;
+        return `${this.v}${this.s.toLowerCase()}`;
     }
 
     public get score() {

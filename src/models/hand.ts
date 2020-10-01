@@ -1,14 +1,34 @@
-import { Board } from './board';
-import { Card } from "./card"
+import { Card, Board } from "."
+import Solver from "pokersolver";
 
 export class Hand {
-    public cards: [Card, Card];
+    private card1?: Card;
 
-    public constructor(card1: Card, card2: Card) {
-        this.cards = [card1, card2];
+    private card2?: Card;
+
+    public addCard(card: Card) {
+        if(!this.card1)
+            this.card1 = card;
+        else if(!this.card2)
+            this.card2 = card;
+        else
+            throw new Error("Cannot add more cards");
     }
 
-    public compute(board: Board) {
+    public get normalized() {
+        let array = [];
+        if(this.card1)
+            array.push(this.card1.id);
+        if(this.card2)
+            array.push(this.card2.id);
+        return array
+    }
 
+    public get full() {
+        return this.card1 && this.card2;
+    }
+
+    public solve(board: Board) {
+        return Solver.solve([...this.normalized, ...board.normalized]);
     }
 }

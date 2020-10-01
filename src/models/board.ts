@@ -1,24 +1,37 @@
 import { Card } from "./card"
+import { Deck, Hand, Player } from "."
+
+const Flop = 3;
+const Turn = 1;
+const River = 1;
 
 export class Board {
-    private values: Array<Card> = [];
+    private cards: Array<Card> = [];
+
+    private deck = new Deck();
+
+    public players: Array<Player> = [];
 
     public add(...cards: Card[]) {
         if((this.length + cards.length) > 5) {
             throw new Error(`Cannot add ${cards.length} cards to board`);
         }
-        this.values.concat(cards);
+        this.cards.concat(cards);
     }
 
     public get length() {
-        return this.values.length;
+        return this.cards.length;
     }
 
-    [Symbol.iterator]() {
-        return this.values.values();
+    public get normalized() {
+        return this.cards.map(v => v.id);
     }
 
-    public matches() {
+    public get values() {
+        return this.cards.values();
+    }
+
+    public matches(hand: Hand) {
 
     }
 }

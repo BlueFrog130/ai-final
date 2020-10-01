@@ -1,12 +1,10 @@
-import { Card } from './card'
-import { Suit } from './suit';
-import { Value } from './value'
+import { Card, Value, Suit, Player } from "."
 
 export class Deck {
     private deck: Array<Card> = [];
 
     public constructor() {
-        this.standardSetup()
+        this.reset()
     }
 
     public get length() {
@@ -16,7 +14,8 @@ export class Deck {
     /**
      * Basic 52 card setup
      */
-    private standardSetup() {
+    public reset() {
+        this.deck = [];
         const values = Object.values(Value);
         const suits = Object.values(Suit);
         for(const value of values) {
@@ -38,13 +37,25 @@ export class Deck {
     }
 
     /**
-     * Deals x cards
+     * Draws card
      */
-    public deal(amount: number) {
-        return this.deck.splice(0, amount);
+    private draw() {
+        return this.deck.splice(0, 1)[0];
     }
 
-    public debug() {
-        return ""
+    /**
+     * Evenly round robin deals cards
+     */
+    public deal(players: Player[]) {
+        while(players.some(p => !p.full)) {
+            players.forEach(p => {
+                let card = this.draw();
+                try {
+                    p.deal(card);
+                } catch(error) {
+                    this.deck.unshift(card);
+                }
+            });
+        }
     }
 }
