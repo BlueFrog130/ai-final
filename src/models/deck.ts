@@ -39,7 +39,7 @@ export class Deck {
     /**
      * Draws card
      */
-    private draw() {
+    public draw() {
         return this.deck.splice(0, 1)[0];
     }
 
