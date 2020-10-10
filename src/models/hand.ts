@@ -2,9 +2,9 @@ import { Card, Board } from "."
 import Solver from "pokersolver";
 
 export class Hand {
-    private card1?: Card;
+    private card1: Card | null = null;
 
-    private card2?: Card;
+    private card2: Card | null = null;
 
     public addCard(card: Card) {
         if(!this.card1)
@@ -16,7 +16,7 @@ export class Hand {
     }
 
     public get normalized() {
-        let array = [];
+        const array = [];
         if(this.card1)
             array.push(this.card1.id);
         if(this.card2)
@@ -25,7 +25,7 @@ export class Hand {
     }
 
     public get full() {
-        return this.card1 && this.card2;
+        return !!this.card1 && !!this.card2;
     }
 
     public solve(board: Board) {

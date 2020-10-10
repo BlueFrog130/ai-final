@@ -1,4 +1,4 @@
-import { Deck, Hand, Player, Card } from "."
+import { Deck, Player, Card } from "."
 
 const Flop = 3;
 const Turn = 1;
@@ -62,7 +62,16 @@ export class Board {
         }
     }
 
-    public matches(hand: Hand) {
+    public playBoard() {
+        if(!this.flopDone)
+            this.flop();
+        else if(!this.turnDone)
+            this.turn();
+        else if(!this.riverDone)
+            this.river();
+    }
 
+    public async deal(ms?: number) {
+        await this.deck.deal(this.players, ms);
     }
 }

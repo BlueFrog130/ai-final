@@ -5,9 +5,24 @@ Vue.use(VueRouter)
 
 const routes: Array<RouteConfig> = [
     {
-        path: '/',
-        name: 'Home',
-        component: () => import(/* webpackChunkName: "home" */ "../views/Home.vue")
+        path: "/",
+        name: "Menu",
+        component: () => import(/* webpackChunkName: "menu" */ "../views/Menu.vue")
+    },
+    {
+        path: "/load",
+        name: "Load",
+        component: () => import(/* webpackChunkName: "load" */ "../views/LoadGame.vue")
+    },
+    {
+        path: "/new",
+        name: "New",
+        component: () => import(/* webpackChunkName: "new" */ "../views/NewGame.vue")
+    },
+    {
+        path: "/game",
+        name: "Game",
+        component: () => import(/* webpackChunkName: "game" */ "../views/Game.vue")
     }
 ]
 

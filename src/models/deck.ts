@@ -46,16 +46,21 @@ export class Deck {
     /**
      * Evenly round robin deals cards
      */
-    public deal(players: Player[]) {
+    public async deal(players: Player[], ms = 500) {
         while(players.some(p => !p.full)) {
-            players.forEach(p => {
-                let card = this.draw();
+            for(const player of players) {
+                const card = this.draw();
                 try {
-                    p.deal(card);
+                    player.deal(card);
                 } catch(error) {
                     this.deck.unshift(card);
                 }
-            });
+                await this.sleep(ms);
+            }
         }
+    }
+
+    private sleep(ms: number) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
