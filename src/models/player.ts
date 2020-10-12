@@ -1,16 +1,15 @@
-import { Hand, Agent, Card } from "."
+import { Type } from "class-transformer"
+import { Card } from './card';
+import { Hand } from './hand';
 
 export class Player {
     public name: string;
 
+    @Type(() => Hand)
     public hand: Hand = new Hand();
 
-    private agent: Agent | null = null;
-
-    constructor(name: string, ai?: boolean) {
+    constructor(name: string) {
         this.name = name;
-        if(ai)
-            this.agent = new Agent();
     }
 
     public get full() {
@@ -19,6 +18,5 @@ export class Player {
 
     public deal(card: Card) {
         this.hand.addCard(card);
-        console.log(`${this.name} drew a ${card.id}`);
     }
 }

@@ -1,16 +1,13 @@
-import { Suit, Value } from "."
+import { Suit } from './suit';
+import { Value } from './value';
 
 export class Card {
     private v: Value;
     private s: Suit;
 
-    public svg: NodeRequire;
-
     public constructor(value: Value, suit: Suit) {
         this.v = value;
         this.s = suit;
-
-        this.svg = require(`@/assets/cards/${this.v}${this.s}.svg`);
     }
 
     public get img() {

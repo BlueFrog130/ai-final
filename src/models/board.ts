@@ -1,15 +1,31 @@
-import { Deck, Player, Card } from "."
+import { Agent } from "./agent";
+import { Type } from "class-transformer"
+import { Card } from './card';
+import { Deck } from './deck';
+import { Player } from './player';
 
 const Flop = 3;
 const Turn = 1;
 const River = 1;
 
 export class Board {
+
+    @Type(() => Card)
     private cards: Array<Card> = [];
 
+    @Type(() => Deck)
     private deck = new Deck();
 
-    public players: Array<Player> = [];
+    @Type(() => Player, {
+        discriminator: {
+            property: "__type",
+            subTypes: [
+                { value: Agent, name: "agent" }
+            ]
+        },
+        keepDiscriminatorProperty: true
+    })
+    public players: Array<Player | Agent> = [];
 
     private get flopDone() {
         return this.cards.length >= 3;

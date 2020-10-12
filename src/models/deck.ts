@@ -1,4 +1,7 @@
-import { Card, Value, Suit, Player } from "."
+import { Card } from './card';
+import { Player } from './player';
+import { Suit } from './suit';
+import { Value } from './value';
 
 export class Deck {
     private deck: Array<Card> = [];
@@ -46,7 +49,7 @@ export class Deck {
     /**
      * Evenly round robin deals cards
      */
-    public async deal(players: Player[], ms = 500) {
+    public async deal<T extends Player>(players: T[], ms = 500) {
         while(players.some(p => !p.full)) {
             for(const player of players) {
                 const card = this.draw();

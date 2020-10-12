@@ -28,13 +28,13 @@ export default class Menu extends Vue {
         {
             title: "New Game",
             action: () => {
-                // Start a new game with options
+                this.$router.push({ name: "New" });
             }
         },
         {
             title: "Load Game",
             action: () => {
-                // Load game from database
+                this.$router.push({ name: "Load" })
             }
         }
     ]
