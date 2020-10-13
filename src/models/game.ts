@@ -5,8 +5,10 @@ import { Type } from "class-transformer"
 export class Game {
     public id: string = "";
 
+    public name: string = "";
+
     @Type(() => Board)
-    public board?: Board;
+    public board!: Board;
 
     public static create() {
         let game = new Game();
