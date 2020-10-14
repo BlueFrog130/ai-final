@@ -2,14 +2,10 @@ import Solver from "pokersolver"
 import { Type } from "class-transformer"
 import { Board } from './board';
 import { Card } from './card';
-import "reflect-metadata"
 
 export class Hand {
-
-    @Type(() => Card)
     private card1: Card | null = null;
 
-    @Type(() => Card)
     private card2: Card | null = null;
 
     public addCard(card: Card) {

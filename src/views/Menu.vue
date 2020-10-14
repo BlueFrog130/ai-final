@@ -13,12 +13,24 @@
 
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator"
+import { Game } from "@/models/game"
+import { classToPlain } from 'class-transformer';
 
 @Component({
     name: "Menu"
 })
 export default class Menu extends Vue {
     private isMounted = false;
+
+    private readonly test = Game.create();
+
+    private created() {
+        this.test.board.addPlayer("Adam");
+    }
+
+    private testMe() {
+        console.log(classToPlain(this.test.board));
+    }
 
     private mounted() {
         this.isMounted = true;
@@ -35,6 +47,12 @@ export default class Menu extends Vue {
             title: "Load Game",
             action: () => {
                 this.$router.push({ name: "Load" })
+            }
+        },
+        {
+            title: "TEST ME",
+            action: () => {
+                this.testMe();
             }
         }
     ]

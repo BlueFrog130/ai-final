@@ -9,7 +9,7 @@ declare module "vue/types/vue" {
 let db: IDBDatabase | null = null;
 
 async function init() {
-    const request = indexedDB.open("PokerDatabase", 1);
+    const request = indexedDB.open("PokerDatabase", 3);
     await new Promise((res, rej) => {
         request.onerror = function(e) {
             console.error("No access to IndexedDB");
@@ -26,6 +26,8 @@ async function init() {
         request.onupgradeneeded = function(e) {
             db = <IDBDatabase> (e.target as any).result;
             db.createObjectStore("games", { keyPath: "id" });
+            db.createObjectStore("boards", { keyPath: "id" });
+            db.createObjectStore("players", { keyPath: "id" });
             return res();
         }
     });
@@ -34,3 +36,9 @@ async function init() {
 }
 
 init();
+
+export const repository = {
+    getGames() {
+
+    }
+}

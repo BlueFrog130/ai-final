@@ -1,52 +1,47 @@
-import { Agent } from "./agent";
-import { Type } from "class-transformer"
+import { Exclude, Transform, Type } from "class-transformer"
 import { Card } from './card';
 import { Deck } from './deck';
 import { Player } from './player';
 import { Log } from './log';
 import { Action } from './action';
+import { Hand } from './hand';
+import * as uuid from "uuid"
 
 const Flop = 3;
 const Turn = 1;
 const River = 1;
 
-interface Blind {
-    amount: number
-    player?: Player | Agent
+class Blind<T extends Player> {
+    public amount: number;
+
+    public player: T | null;
+
+    constructor(amount: number, player: T | null = null) {
+        this.amount = amount;
+        this.player = player;
+    }
 }
 
 export class Board {
+    public id: string;
 
     @Type(() => Card)
-    private cards: Array<Card> = [];
+    public cards: Array<Card> = [];
 
     @Type(() => Deck)
-    private deck = new Deck();
+    public deck = new Deck();
 
-    @Type(() => Player, {
-        discriminator: {
-            property: "__type",
-            subTypes: [
-                { value: Agent, name: "agent" }
-            ]
-        },
-        keepDiscriminatorProperty: true
-    })
-    public players: Array<Player | Agent> = [];
+    @Transform((value: Player[]) => value.map(p => p.id), { toPlainOnly: true })
+    public players: Array<Player> = [];
 
-    public current?: Player | Agent = undefined;
+    @Transform((value) => value?.id, { toPlainOnly: true })
+    public current?: Player = undefined;
 
     public pot = 0;
 
-    public smallBlind: Blind = {
-        amount: 100,
-        player: undefined
-    }
+    public smallBlind = new Blind(100);
 
-    public bigBlind: Blind = {
-        amount: 200,
-        player: undefined
-    }
+    public bigBlind = new Blind(200);
 
     public log: Log[] = [];
 
@@ -63,6 +58,14 @@ export class Board {
     private initialized = false;
 
     private currentBet = 0;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    public static create() {
+        return new Board(uuid.v4());
+    }
 
     private get flopDone() {
         return this.cards.length >= 3;
@@ -92,7 +95,11 @@ export class Board {
     }
 
     public addPlayer(name: string) {
-        this.players.push(new Player(name, this));
+        this.players.push(Player.create(name, this));
+    }
+
+    public addAgent(name: string) {
+        this.players.push(Player.create(name, this, true));
     }
 
     private dealFlop() {

@@ -1,12 +1,17 @@
-import { Type } from "class-transformer"
+import { Exclude, Type } from "class-transformer"
 import { Board } from './board';
 import { Card } from './card';
 import { Hand } from './hand';
+import * as uuid from "uuid";
 
 export class Player {
-    public name: string;
+    public id: string;
 
     public board: Board;
+
+    public agent: boolean;
+
+    public name: string;
 
     public money: number = 2000;
 
@@ -14,12 +19,17 @@ export class Player {
 
     public turnBet = 0;
 
-    @Type(() => Hand)
     public hand: Hand = new Hand();
 
-    constructor(name: string, board: Board) {
+    constructor(name: string, board: Board, agent = false, id?: string) {
         this.name = name;
         this.board = board;
+        this.agent = agent;
+        this.id = id || uuid.v4();
+    }
+
+    public static create(name: string, board: Board, agent = false, id?: string) {
+        return new Player(name, board, agent, id);
     }
 
     public get full() {
