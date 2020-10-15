@@ -3,13 +3,17 @@ import { Board } from './board';
 import { Card } from './card';
 import { Hand } from './hand';
 import * as uuid from "uuid";
+import { uniqueNamesGenerator, names } from "unique-names-generator";
 
 export class Player {
     public id: string;
 
+    @Exclude({ toPlainOnly: true })
     public board: Board;
 
     public agent: boolean;
+
+    public localPlayer: boolean;
 
     public name: string;
 
@@ -19,17 +23,23 @@ export class Player {
 
     public turnBet = 0;
 
+    @Type(() => Hand)
     public hand: Hand = new Hand();
 
-    constructor(name: string, board: Board, agent = false, id?: string) {
+    constructor(name: string, board: Board, agent = false, id?: string, localPlayer = false) {
         this.name = name;
         this.board = board;
         this.agent = agent;
         this.id = id || uuid.v4();
+        this.localPlayer = localPlayer;
     }
 
-    public static create(name: string, board: Board, agent = false, id?: string) {
-        return new Player(name, board, agent, id);
+    public static create(name: string, board: Board) {
+        return new Player(name, board, undefined, undefined, true);
+    }
+
+    public static createAgent(board: Board) {
+        return new Player(uniqueNamesGenerator({ dictionaries: [names] }), board, true);
     }
 
     public get full() {

@@ -22,6 +22,12 @@ class Blind<T extends Player> {
     }
 }
 
+export enum RoundState {
+    Waiting,
+    Started,
+    Finished
+}
+
 export class Board {
     public id: string;
 
@@ -39,10 +45,13 @@ export class Board {
 
     public pot = 0;
 
+    @Type(() => Blind)
     public smallBlind = new Blind(100);
 
+    @Type(() => Blind)
     public bigBlind = new Blind(200);
 
+    @Type(() => Log)
     public log: Log[] = [];
 
     /**
@@ -55,16 +64,35 @@ export class Board {
      */
     public turn = 0;
 
-    private initialized = false;
+    public initialized = false;
 
-    private currentBet = 0;
+    public currentBet = 0;
 
-    constructor(id: string) {
-        this.id = id;
+    public state = RoundState.Waiting;
+
+    constructor(opts?: { id: string, players?: Player[], current?: string }) {
+        if(opts) {
+            this.id = opts.id;
+            if(opts.players) {
+                this.players = opts.players;
+                this.players.forEach((p) => {
+                    p.board = this;
+                })
+            }
+            if(opts.current) {
+                this.current = this.players.find(p => p.id === opts.current);
+            }
+            else {
+                this.current = undefined;
+            }
+        }
+        else {
+            this.id = "";
+        }
     }
 
     public static create() {
-        return new Board(uuid.v4());
+        return new Board({ id: uuid.v4() });
     }
 
     private get flopDone() {
@@ -98,8 +126,8 @@ export class Board {
         this.players.push(Player.create(name, this));
     }
 
-    public addAgent(name: string) {
-        this.players.push(Player.create(name, this, true));
+    public addAgent() {
+        this.players.push(Player.createAgent(this));
     }
 
     private dealFlop() {
@@ -169,6 +197,7 @@ export class Board {
         this.round++;
         this.pot = 0;
         this.turn = 1;
+        this.state = RoundState.Started;
         if(!this.initialized) {
             this.init();
         }

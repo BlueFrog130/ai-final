@@ -19,6 +19,7 @@
     "es6-shim": "^0.35.5",
     "pokersolver": "^2.1.4",
     "reflect-metadata": "^0.1.13",
+    "unique-names-generator": "^4.3.1",
     "uuid": "^8.3.1",
     "vue": "^2.6.11",
     "vue-class-component": "^7.2.3",

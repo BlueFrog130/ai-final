@@ -11,9 +11,6 @@ class RootState {
 const mutations: MutationTree<RootState> = {
     setGame(state, game) {
         state.game = game;
-    },
-    newGame(state) {
-        state.game = Game.create();
     }
 }
 
