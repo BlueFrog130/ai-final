@@ -4,9 +4,9 @@ import { Board } from './board';
 import { Card } from './card';
 
 export class Hand {
-    private card1: Card | null = null;
+    public card1: Card | null = null;
 
-    private card2: Card | null = null;
+    public card2: Card | null = null;
 
     public addCard(card: Card) {
         if(!this.card1)
