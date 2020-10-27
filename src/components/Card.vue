@@ -1,11 +1,11 @@
 <template>
     <div class="flip">
-        <div class="inner" :class="{ 'flipped': hidden }" :style="style">
+        <div class="inner" :class="{ 'flipped': hidden }">
             <div class="front">
-                <img ref="img-card" :src="card ? card.img : ''" :style="imgStyle" >
+                <img ref="img-card" :src="card ? card.img : ''" >
             </div>
             <div class="back">
-                <img :src="back" :style="imgStyle" >
+                <img :src="back" >
             </div>
         </div>
     </div>
@@ -96,6 +96,8 @@ export default class Card extends Vue {
     background-color: transparent;
     perspective: 1000px;
     display: inline-block;
+    width: 100%;
+    height: 100%;
 
     > .inner {
         position: relative;

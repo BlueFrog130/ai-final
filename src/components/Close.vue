@@ -31,6 +31,7 @@ export default class Close extends Vue {
     font-size: 2em;
     top: 0.5em;
     right: 0.5em;
+    z-index: 10;
     cursor: pointer;
     &:hover {
         color: red;

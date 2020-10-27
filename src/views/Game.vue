@@ -3,10 +3,26 @@
         <close :game="game" />
         <div class="play-area">
             <div class="other">
+                <div class="top">
+                    <template v-for="player in agents">
+                        <div :key="player.id" class="player-slot" >
 
+                        </div>
+                    </template>
+                </div>
+                <div class="middle">
+                    <div class="deck">
+                        <board :board="game.board" />
+                    </div>
+                </div>
             </div>
             <div class="player">
+                <div class="controls">
 
+                </div>
+                <div class="hand">
+
+                </div>
             </div>
         </div>
     </div>
@@ -17,11 +33,13 @@ import { Vue, Component, Prop } from "vue-property-decorator"
 import Close from "@/components/Close.vue"
 import { Game } from '@/models/game';
 import { Player } from '@/models/player';
+import Board from "@/components/Board.vue";
 
 @Component({
     name: "Game",
     components: {
-        Close
+        Close,
+        Board
     }
 })
 export default class GameComponent extends Vue {
@@ -37,6 +55,10 @@ export default class GameComponent extends Vue {
         }
         console.log(this.player);
     }
+
+    private get agents() {
+        return this.game.board.players.filter(p => !p.localPlayer);
+    }
 }
 </script>
 
@@ -51,8 +73,23 @@ export default class GameComponent extends Vue {
     width: 100%;
     height: 100%;
     display: flex;
+    flex-direction: column;
     .other {
+        display: flex;
         flex-grow: 1;
+        flex-direction: column;
+        .top, .middle {
+            height: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            > * {
+                width: 100%;
+                height: 100%;
+            }
+        }
     }
 }
 </style>

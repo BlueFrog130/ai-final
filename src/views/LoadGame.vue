@@ -1,7 +1,13 @@
 <template>
     <div class="load-game">
         <close />
-        <template v-for="(game, index) in games">
+        <template v-if="loading">
+            <h5>Loading...</h5>
+        </template>
+        <template v-else-if="games.length == 0">
+            <h5>No Games Found</h5>
+        </template>
+        <template v-else v-for="(game, index) in games">
             <div class="game-display" :key="index" @click="load(game.id)">
                 <div>
                     <h4>{{ game.name }}</h4>
@@ -27,6 +33,7 @@ import Close from "@/components/Close.vue"
     }
 })
 export default class LoadGame extends Vue {
+    private loading = false;
     private games: { name: string, id: string }[] = [];
 
     private created() {
@@ -34,8 +41,10 @@ export default class LoadGame extends Vue {
     }
 
     private fetch() {
+        this.loading = true;
         Game.getGames().then((v) => {
             this.games = v;
+            this.loading = false;
         });
     }
 

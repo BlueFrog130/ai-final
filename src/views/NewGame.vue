@@ -39,7 +39,7 @@ export default class NewGame extends Vue {
 
     private gameName = "";
 
-    private readonly MAX_AGENTS = 6;
+    private readonly MAX_AGENTS = 5;
 
     private agents = 0;
 
