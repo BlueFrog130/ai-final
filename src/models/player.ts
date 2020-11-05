@@ -4,6 +4,7 @@ import { Card } from './card';
 import { Hand } from './hand';
 import * as uuid from "uuid";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
+import { Action } from './action';
 
 export class Player {
     public id: string;
@@ -22,6 +23,8 @@ export class Player {
     public folded = false;
 
     public turnBet = 0;
+
+    public playedRound = false;
 
     @Type(() => Hand)
     public hand: Hand = new Hand();
@@ -50,6 +53,27 @@ export class Player {
         return this.money === 0;
     }
 
+    public get actions() {
+        let a: Action[] = [];
+        if(this.board.currentBet === 0)
+            a.push(Action.Check, Action.Bet)
+        if(this.board.currentBet > this.turnBet)
+            a.push(Action.Call, Action.Raise, Action.Fold)
+        return a;
+    }
+
+    public get minRaise() {
+        return (this.board.currentBet * 2) > this.money ? this.money : (this.board.currentBet * 2);
+    }
+
+    public get maxRaise() {
+        return this.money;
+    }
+
+    public get call() {
+        return this.board.currentBet - this.turnBet;
+    }
+
     public deal(card: Card) {
         this.hand.addCard(card);
     }
@@ -63,6 +87,18 @@ export class Player {
         }
         const bet = amount - adjusted;
         this.turnBet = bet;
-        return bet;
+        this.board.pot += bet;
+    }
+
+    public reset() {
+        this.hand.card1 = null;
+        this.hand.card2 = null;
+        this.turnBet = 0;
+        this.playedRound = false;
+        this.folded = false;
+    }
+
+    public play(action: Action) {
+
     }
 }

@@ -4,8 +4,10 @@ import { Board } from './board';
 import { Card } from './card';
 
 export class Hand {
+    @Type(() => Card)
     public card1: Card | null = null;
 
+    @Type(() => Card)
     public card2: Card | null = null;
 
     public addCard(card: Card) {

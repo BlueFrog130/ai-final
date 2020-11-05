@@ -7,18 +7,29 @@ import { Action } from './action';
 import { Hand } from './hand';
 import * as uuid from "uuid"
 
-const Flop = 3;
-const Turn = 1;
-const River = 1;
+const FLOP = 3;
+const TURN = 1;
+const RIVER = 1;
 
-class Blind<T extends Player> {
-    public amount: number;
+class Turn {
+    public number = 0;
 
-    public player: T | null;
+    public smallBlind = {
+        amount: 100,
+        player: -1
+    }
 
-    constructor(amount: number, player: T | null = null) {
-        this.amount = amount;
-        this.player = player;
+    public bigBlind = {
+        amount: 100,
+        player: -1
+    }
+
+    public get smallBlindSet() {
+        return !(this.smallBlind.player === -1);
+    }
+
+    public get bigBlindSet() {
+        return !(this.bigBlind.player === -1);
     }
 }
 
@@ -45,12 +56,6 @@ export class Board {
 
     public pot = 0;
 
-    @Type(() => Blind)
-    public smallBlind = new Blind(100);
-
-    @Type(() => Blind)
-    public bigBlind = new Blind(200);
-
     @Type(() => Log)
     public log: Log[] = [];
 
@@ -62,7 +67,8 @@ export class Board {
     /**
      * Tracks turn number in round
      */
-    public turn = 0;
+    @Type(() => Turn)
+    public turn = new Turn();
 
     public initialized = false;
 
@@ -133,7 +139,7 @@ export class Board {
     private dealFlop() {
         if(this.flopDone)
             return;
-        for(let i = 0; i < Flop; i++) {
+        for(let i = 0; i < FLOP; i++) {
             this.add(this.deck.draw());
         }
     }
@@ -141,7 +147,7 @@ export class Board {
     private dealTurn() {
         if(this.turnDone)
             return;
-        for(let i = 0; i < Turn; i++) {
+        for(let i = 0; i < TURN; i++) {
             this.add(this.deck.draw())
         }
     }
@@ -149,7 +155,7 @@ export class Board {
     private dealRiver() {
         if(this.riverDone)
             return;
-        for(let i = 0; i < River; i++) {
+        for(let i = 0; i < RIVER; i++) {
             this.add(this.deck.draw())
         }
     }
@@ -171,16 +177,20 @@ export class Board {
         if(this.players.length < 2) {
             throw new Error("Need 2 or more players");
         }
-        if(!this.smallBlind.player || !this.bigBlind.player) {
-            this.smallBlind.player = this.players[0];
-            this.pot += this.smallBlind.player.bet(this.smallBlind.amount);
-            this.bigBlind.player = this.players[1];
-            this.pot += this.bigBlind.player.bet(this.bigBlind.amount);
+        if(this.turn.smallBlind.player === -1 || this.turn.bigBlind.player === -1) {
+            this.turn.smallBlind.player = 0;
+            this.getPlayer(this.turn.smallBlind.player).bet(this.turn.smallBlind.amount);
+            this.turn.bigBlind.player = 1;
+            this.getPlayer(this.turn.bigBlind.player).bet(this.turn.bigBlind.amount);
         }
         this.initialized = true;
     }
 
-    private findPlayer<T extends Player>(player: T) {
+    private getPlayer(player: number) {
+        return this.players[player];
+    }
+
+    private findPlayer(player: Player) {
         for(let i = 0, l = this.players.length; i < l; i++) {
             if(player === this.players[i]) {
                 return i;
@@ -189,44 +199,47 @@ export class Board {
         return -1;
     }
 
-    private nextPlayer<T extends Player>(player: T) {
-        return this.players[(this.findPlayer(player) + 1) % this.players.length];
+    private nextPlayer(player: Player | number) {
+        let idx = typeof player === "number" ? player : this.findPlayer(player);
+        return this.players[(idx + 1) % this.players.length];
     }
 
     public startRound() {
+        console.log(this);
         this.round++;
         this.pot = 0;
-        this.turn = 1;
-        this.state = RoundState.Started;
+        this.turn.number = 1;
+        this.deck.reset();
         if(!this.initialized) {
             this.init();
         }
         else {
-            if(!this.smallBlind.player || !this.bigBlind.player) {
+            if(!this.turn.smallBlindSet || !this.turn.bigBlindSet) {
                 throw new Error("Failed to initialize");
             }
-            let sbIdx = this.findPlayer(this.smallBlind.player);
-            if(sbIdx) {
-                throw new Error("Player not found");
-            }
-            this.smallBlind.player = this.players[sbIdx % this.players.length];
-            this.pot += this.smallBlind.player.bet(this.smallBlind.amount);
-            let bbIdx = this.findPlayer(this.bigBlind.player);
-            if(sbIdx) {
-                throw new Error("Player not found");
-            }
-            this.bigBlind.player = this.players[bbIdx % this.players.length];
-            this.pot += this.bigBlind.player.bet(this.bigBlind.amount);
+            this.turn.smallBlind.player = (this.turn.smallBlind.player + 1) % this.players.length;
+            this.getPlayer(this.turn.smallBlind.player).bet(this.turn.smallBlind.amount);
+
+            this.turn.bigBlind.player = (this.turn.bigBlind.player + 1) % this.players.length;
+            this.getPlayer(this.turn.bigBlind.player).bet(this.turn.bigBlind.amount);
         }
-        if(!this.smallBlind.player || !this.bigBlind.player) {
+        if(!this.turn.smallBlindSet || !this.turn.bigBlindSet) {
             throw new Error("Failed to initialize");
         }
-        this.current = this.nextPlayer(this.bigBlind.player);
-        this.players.forEach(p => p.turnBet = 0);
-        this.currentBet = this.bigBlind.amount;
+        this.current = this.nextPlayer(this.turn.bigBlind.player);
+        this.players.forEach(p => p.reset());
+        this.currentBet = this.turn.bigBlind.amount;
+        this.deck.deal(this.players);
+        this.state = RoundState.Started;
     }
 
-    public action<T extends Player>(player: T, action: Action, amount = 0) {
+    public nextTurn() {
+        this.turn.number++;
+        this.currentBet = 0;
+        this.players.forEach(p => p.turnBet = 0);
+    }
+
+    public action(player: Player, action: Action, amount = 0) {
         switch(action) {
         case Action.Fold:
             player.folded = true;
@@ -237,6 +250,17 @@ export class Board {
         case Action.Call:
 
             break;
+        case Action.Raise:
+            // Must DOUBLE the bet
+
+            break;
+        case Action.Bet:
+            // Cannot be a current bet
+            break;
         }
+    }
+
+    public play() {
+
     }
 }

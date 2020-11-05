@@ -1,15 +1,26 @@
 <template>
     <div class="hand">
-        <card v-for="(card, i) in cards" :key="i" class="card" :card="card" />
+        <card-slot
+            v-for="(card, i) in cards" :key="i"
+            class="card"
+            :cards="card.card"
+            :flipped="!!card.card"
+            :hide="!card.card"
+            :rotate="card.skew"
+            />
     </div>
 </template>
 
 <script lang="ts">
 import { Player } from '@/models/player'
 import { Component, Prop, Vue } from "vue-property-decorator"
+import CardSlot from "@/components/CardSlot.vue"
 
 @Component({
-    name: "Hand"
+    name: "Hand",
+    components: {
+        CardSlot
+    }
 })
 export default class HandComponent extends Vue {
     @Prop(Object)
@@ -19,7 +30,7 @@ export default class HandComponent extends Vue {
         if(!this.player) {
             return [];
         }
-        return [this.player.hand.card1, this.player.hand.card2];
+        return [{card: this.player.hand.card1, skew: -5}, {card: this.player.hand.card2, skew: 5}];
     }
 }
 </script>
