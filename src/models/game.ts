@@ -37,7 +37,7 @@ export class Game {
         const dbBoard = <any> await repository.get(Board, dbGame.board);
         const dbPlayers = <any[]> await Promise.all(dbBoard.players.map((p: string) => repository.get(Player, p)));
         const players = plainToClass(Player, dbPlayers);
-        const board = new Board({ id: dbBoard.id, players, current: dbBoard.current });
+        const board = new Board({ id: dbBoard.id, players, current: dbBoard.current, state: dbBoard.state, pot: dbBoard.pot, currentBet: dbBoard.currentBet, initialized: dbBoard.initialized, log: dbBoard.log, turn: dbBoard.turn, round: dbBoard.round, deck: dbBoard.deck, cards: dbBoard.cards });
         return new Game({ id: dbGame.id, board, name: dbGame.name });
     }
 

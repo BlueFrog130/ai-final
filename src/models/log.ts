@@ -3,21 +3,13 @@ import { Board } from './board';
 import { Player } from './player';
 
 export class Log {
-    // public action: Action;
+    public action: Action = Action.Unknown;
 
-    // public amount = 0;
+    public amount = 0;
 
-    // public player: Player;
+    public player: string = "";
 
-    // public round: number;
+    public round = -1;
 
-    // public turn: number;
-
-    // constructor(board: Board) {
-    //     this.action = action;
-    //     this.player = player;
-    //     if(amount) {
-    //         this.amount = amount;
-    //     }
-    // }
+    public turn = -1;
 }

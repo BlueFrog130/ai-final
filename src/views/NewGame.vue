@@ -49,7 +49,7 @@ export default class NewGame extends Vue {
 
     private startGame() {
         const game = Game.create(this.gameName);
-        game.board.addPlayer(name);
+        game.board.addPlayer(this.name);
         for(let i = 0; i < this.agents; i++) {
             game.board.addAgent();
         }

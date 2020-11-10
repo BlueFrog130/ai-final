@@ -1,4 +1,4 @@
-import { Exclude, Transform, Type } from "class-transformer"
+import { Exclude, plainToClass, Transform, Type } from "class-transformer"
 import { Card } from './card';
 import { Deck } from './deck';
 import { Player } from './player';
@@ -6,6 +6,7 @@ import { Log } from './log';
 import { Action } from './action';
 import { Hand } from './hand';
 import * as uuid from "uuid"
+import Solver from "pokersolver"
 
 const FLOP = 3;
 const TURN = 1;
@@ -20,7 +21,7 @@ class Turn {
     }
 
     public bigBlind = {
-        amount: 100,
+        amount: 200,
         player: -1
     }
 
@@ -76,7 +77,9 @@ export class Board {
 
     public state = RoundState.Waiting;
 
-    constructor(opts?: { id: string, players?: Player[], current?: string }) {
+    public winner: number[] = [];
+
+    constructor(opts?: { id: string, players?: Player[], current?: string, state?: number, pot?: number, currentBet?: number, initialized?: boolean, log?: Log[], turn?: Turn, round?: number, cards?: Card[], deck?: Deck; }) {
         if(opts) {
             this.id = opts.id;
             if(opts.players) {
@@ -90,6 +93,33 @@ export class Board {
             }
             else {
                 this.current = undefined;
+            }
+            if(opts.currentBet) {
+                this.currentBet = opts.currentBet;
+            }
+            if(opts.initialized) {
+                this.initialized = opts.initialized;
+            }
+            if(opts.pot) {
+                this.pot = opts.pot;
+            }
+            if(opts.state) {
+                this.state = opts.state;
+            }
+            if(opts.log) {
+                this.log = plainToClass(Log, opts.log);
+            }
+            if(opts.turn) {
+                this.turn = plainToClass(Turn, opts.turn);
+            }
+            if(opts.round) {
+                this.round = opts.round;
+            }
+            if(opts.cards) {
+                this.cards = plainToClass(Card, opts.cards);
+            }
+            if(opts.deck) {
+                this.deck = plainToClass(Deck, opts.deck);
             }
         }
         else {
@@ -121,6 +151,14 @@ export class Board {
         return this.cards.values();
     }
 
+    public get turnFinished() {
+        return this.activePlayers.every(v => v.turnBet === this.currentBet && v.playedTurn);
+    }
+
+    public get activePlayers() {
+        return this.players.filter(p => !p.folded);
+    }
+
     private add(...cards: Card[]) {
         if((this.cards.length + cards.length) > 5) {
             throw new Error(`Cannot add ${cards.length} cards to board`);
@@ -137,8 +175,10 @@ export class Board {
     }
 
     private dealFlop() {
+        console.log("attempting flop...")
         if(this.flopDone)
             return;
+        console.log("flopping!")
         for(let i = 0; i < FLOP; i++) {
             this.add(this.deck.draw());
         }
@@ -161,6 +201,7 @@ export class Board {
     }
 
     public dealBoard() {
+        console.log("dealing board")
         if(!this.flopDone)
             this.dealFlop();
         else if(!this.turnDone)
@@ -190,7 +231,7 @@ export class Board {
         return this.players[player];
     }
 
-    private findPlayer(player: Player) {
+    public findPlayer(player: Player) {
         for(let i = 0, l = this.players.length; i < l; i++) {
             if(player === this.players[i]) {
                 return i;
@@ -199,9 +240,19 @@ export class Board {
         return -1;
     }
 
-    private nextPlayer(player: Player | number) {
-        let idx = typeof player === "number" ? player : this.findPlayer(player);
-        return this.players[(idx + 1) % this.players.length];
+    public findActivePlayer(player: Player) {
+        for(let i = 0, l = this.activePlayers.length; i < l; i++) {
+            if(player === this.activePlayers[i]) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private nextPlayer(player: Player | number): Player {
+        let idx = typeof player === "number" ? player : this.findActivePlayer(player);
+        let p = this.activePlayers[(idx + 1) % this.activePlayers.length];
+        return p;
     }
 
     public startRound() {
@@ -209,7 +260,10 @@ export class Board {
         this.round++;
         this.pot = 0;
         this.turn.number = 1;
+        this.winner = [];
         this.deck.reset();
+        this.players.forEach(p => p.reset());
+
         if(!this.initialized) {
             this.init();
         }
@@ -226,8 +280,8 @@ export class Board {
         if(!this.turn.smallBlindSet || !this.turn.bigBlindSet) {
             throw new Error("Failed to initialize");
         }
+
         this.current = this.nextPlayer(this.turn.bigBlind.player);
-        this.players.forEach(p => p.reset());
         this.currentBet = this.turn.bigBlind.amount;
         this.deck.deal(this.players);
         this.state = RoundState.Started;
@@ -236,31 +290,110 @@ export class Board {
     public nextTurn() {
         this.turn.number++;
         this.currentBet = 0;
-        this.players.forEach(p => p.turnBet = 0);
+        this.players.forEach(p => {
+            p.turnBet = 0;
+            p.playedTurn = false
+        });
+        this.dealBoard();
     }
 
     public action(player: Player, action: Action, amount = 0) {
+        let log = new Log();
+        log.player = player.id;
+        log.round = this.round;
+        log.turn = this.turn.number;
         switch(action) {
         case Action.Fold:
             player.folded = true;
+            log.action = Action.Fold;
             break;
         case Action.Check:
             // do nothing
+            log.action = Action.Check;
             break;
         case Action.Call:
-
+            player.bet(player.call);
+            log.action = Action.Call;
+            log.amount = player.call;
             break;
         case Action.Raise:
             // Must DOUBLE the bet
-
+            player.bet(amount);
+            this.currentBet = amount;
+            log.action = Action.Raise;
+            log.amount = amount;
             break;
         case Action.Bet:
             // Cannot be a current bet
+            player.bet(amount);
+            this.currentBet = amount;
+            log.action = Action.Bet;
+            log.amount = amount;
             break;
         }
+        this.log.push(log);
+        player.playedTurn = true;
     }
 
-    public play() {
+    public play(action?: { action: Action, amount?: number }) {
+        switch(this.state)
+        {
+            case RoundState.Waiting:
+                console.log("Starting round...");
+                this.startRound();
+                break;
+            case RoundState.Finished:
+                console.log("Next round...");
+                this.startRound();
+                break;
+            case RoundState.Started:
+                console.log("Playing...");
+                if(!this.current)
+                    throw new Error("No Current player");
+                if(!action)
+                    throw new Error("No action passed");
+                this.action(this.current, action.action, action.amount);
 
+                // Win conditions
+                if(this.activePlayers.length === 1) {
+                    let winningPlayer = this.activePlayers[0];
+                    let winningIndex = this.findPlayer(winningPlayer);
+                    if(winningIndex === -1) {
+                        throw new Error("No winner??");
+                    }
+                    this.winner = [winningIndex];
+                    winningPlayer.money += this.pot;
+                    this.pot = 0;
+                    this.state = RoundState.Finished;
+                }
+                if(this.turnFinished && this.riverDone) {
+                    // check for winner
+                    let winningHand = Solver.winners(this.activePlayers.map(s => s.solverHand));
+                    if(!Array.isArray(winningHand)) {
+                        winningHand = [winningHand];
+                    }
+                    for(const wh of winningHand) {
+                        let winningPlayer = this.activePlayers.find(p => p.solverHand === wh);
+                        if(!winningPlayer) {
+                            throw new Error("Cannot find winning player");
+                        }
+                        console.log(this.pot / winningHand.length);
+                        winningPlayer.money += (this.pot / winningHand.length);
+                        this.winner.push(this.findPlayer(winningPlayer));
+                    }
+                    this.pot = 0;
+                    this.state = RoundState.Finished;
+                }
+
+                // Start next turn
+                if(this.state !== RoundState.Finished) {
+                    this.current = this.nextPlayer(this.current);
+                    if(this.turnFinished) {
+                        console.log("Starting next turn!")
+                        this.nextTurn();
+                    }
+                }
+                break;
+        }
     }
 }

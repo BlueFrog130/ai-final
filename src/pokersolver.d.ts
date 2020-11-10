@@ -8,5 +8,5 @@ declare module "pokersolver" {
     }
     function solve(cards: Array<string>): Hand
 
-    function winners(hands: Hand[]): Hand
+    function winners(hands: Hand[]): Hand | Hand[]
 }

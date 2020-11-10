@@ -1,10 +1,14 @@
 <template>
     <div class="community">
+        <h2>
+            ${{ board.pot }}
+        </h2>
         <div>
-            <card-slot :cards="length" />
+            <card-slot ref="base" :cards="length" />
         </div>
         <template v-for="i in 5">
-            <card-slot outlined hide :key="i" />
+            <card-slot outlined 
+            hide :key="i" />
         </template>
     </div>
 </template>
@@ -28,6 +32,10 @@ export default class community extends Vue {
 
     private get length() {
         return this.board.deck.length;
+    }
+
+    public imgHeight() {
+        return (this.$refs["base"] as CardSlot).imgHeight();
     }
 }
 </script>

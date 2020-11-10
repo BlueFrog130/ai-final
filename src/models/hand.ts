@@ -31,8 +31,4 @@ export class Hand {
     public get full() {
         return !!this.card1 && !!this.card2;
     }
-
-    public solve(board: Board) {
-        return Solver.solve([...this.normalized, ...board.normalized]);
-    }
 }

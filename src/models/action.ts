@@ -1,4 +1,5 @@
 export enum Action {
+    Unknown,
     Check,
     Call,
     Bet,

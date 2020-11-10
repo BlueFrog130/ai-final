@@ -5,6 +5,7 @@ import { Hand } from './hand';
 import * as uuid from "uuid";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { Action } from './action';
+import Solver from "pokersolver"
 
 export class Player {
     public id: string;
@@ -24,7 +25,7 @@ export class Player {
 
     public turnBet = 0;
 
-    public playedRound = false;
+    public playedTurn = false;
 
     @Type(() => Hand)
     public hand: Hand = new Hand();
@@ -55,7 +56,7 @@ export class Player {
 
     public get actions() {
         let a: Action[] = [];
-        if(this.board.currentBet === 0)
+        if(this.call === 0)
             a.push(Action.Check, Action.Bet)
         if(this.board.currentBet > this.turnBet)
             a.push(Action.Call, Action.Raise, Action.Fold)
@@ -74,19 +75,31 @@ export class Player {
         return this.board.currentBet - this.turnBet;
     }
 
+    public get solverHand() {
+        return Solver.solve([...this.hand.normalized, ...this.board.normalized]);
+    }
+
+    public get index() {
+        return this.board.findPlayer(this);
+    }
+
+    public get activeIndex() {
+        return this.board.findActivePlayer(this);
+    }
+
     public deal(card: Card) {
         this.hand.addCard(card);
     }
 
     public bet(amount: number) {
         let adjusted = 0;
-        this.money - amount;
+        this.money -= amount;
         if(this.money < 0) {
            adjusted = this.money * -1;
            this.money = 0;
         }
         const bet = amount - adjusted;
-        this.turnBet = bet;
+        this.turnBet += bet;
         this.board.pot += bet;
     }
 
@@ -94,11 +107,7 @@ export class Player {
         this.hand.card1 = null;
         this.hand.card2 = null;
         this.turnBet = 0;
-        this.playedRound = false;
+        this.playedTurn = false;
         this.folded = false;
-    }
-
-    public play(action: Action) {
-
     }
 }

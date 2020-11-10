@@ -76,6 +76,10 @@ html {
 .slow-fade-enter, .slow-fade-leave-to {
     opacity: 0;
 }
+.fit {
+    height: 100%;
+    width: 100%;
+}
 
 button {
     color: #494949;
