@@ -37,6 +37,12 @@ export default class Menu extends Vue {
             action: () => {
                 this.$router.push({ name: "Load" })
             }
+        },
+        {
+            title: "Train Model",
+            action: () => {
+                this.$router.push({ name: "Trainer" })
+            }
         }
     ]
 }
