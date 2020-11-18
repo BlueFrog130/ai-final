@@ -1,12 +1,11 @@
 declare module "pokersolver" {
-    interface Hand {
+    class Hand {
+        static solve(cards: Array<string>): Hand
+        static winners(hands: Hand[]): Hand | Hand[]
         cardPool: Array<any>
         cards: Array<any>
         descr: string
         name: string
         rank: number
     }
-    function solve(cards: Array<string>): Hand
-
-    function winners(hands: Hand[]): Hand | Hand[]
 }

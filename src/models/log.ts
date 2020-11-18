@@ -1,15 +1,43 @@
 import { Action } from './action';
-import { Board } from './board';
-import { Player } from './player';
 
 export class Log {
+    public player: string | null = null;
+
     public action: Action = Action.Unknown;
 
     public amount = 0;
 
-    public player: string = "";
+    public currentBet = 0;
 
-    public round = -1;
+    public hand: string[] = [];
 
-    public turn = -1;
+    public cards: string[] = [];
+
+    public toTrainingData() {
+        return {
+            input: {
+                currentBet: this.currentBet,
+                hand: this.hand,
+                cards: this.cards
+            },
+            output: {
+                action: this.action,
+                amount: this.amount
+            }
+        }
+    }
+
+    public toRnnTrainingData() {
+        return {
+            input: [this.currentBet, this.hand, this.cards],
+            output: [this.action, this.amount]
+        }
+    }
+
+    public static fromRnnData([action, amount]: [number, number]) {
+        return {
+            action,
+            amount
+        }
+    }
 }

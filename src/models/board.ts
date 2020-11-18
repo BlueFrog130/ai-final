@@ -4,9 +4,8 @@ import { Deck } from './deck';
 import { Player } from './player';
 import { Log } from './log';
 import { Action } from './action';
-import { Hand } from './hand';
 import * as uuid from "uuid"
-import Solver from "pokersolver"
+import { Hand } from "pokersolver"
 
 const FLOP = 3;
 const TURN = 1;
@@ -57,9 +56,6 @@ export class Board {
 
     public pot = 0;
 
-    @Type(() => Log)
-    public log: Log[] = [];
-
     /**
      * Tracks current round in game
      */
@@ -79,13 +75,16 @@ export class Board {
 
     public winner: number[] = [];
 
-    constructor(opts?: { id: string, players?: Player[], current?: string, state?: number, pot?: number, currentBet?: number, initialized?: boolean, log?: Log[], turn?: Turn, round?: number, cards?: Card[], deck?: Deck; }) {
+    constructor(opts?: { id: string, players?: Player[], current?: string, state?: number, pot?: number, currentBet?: number, initialized?: boolean, turn?: Turn, round?: number, cards?: Card[], deck?: Deck; }) {
         if(opts) {
             this.id = opts.id;
             if(opts.players) {
                 this.players = opts.players;
                 this.players.forEach((p) => {
                     p.board = this;
+                    if(p.agent) {
+                        p.initialize();
+                    }
                 })
             }
             if(opts.current) {
@@ -105,9 +104,6 @@ export class Board {
             }
             if(opts.state) {
                 this.state = opts.state;
-            }
-            if(opts.log) {
-                this.log = plainToClass(Log, opts.log);
             }
             if(opts.turn) {
                 this.turn = plainToClass(Turn, opts.turn);
@@ -152,18 +148,22 @@ export class Board {
     }
 
     public get turnFinished() {
-        return this.activePlayers.every(v => v.turnBet === this.currentBet && v.playedTurn);
+        return this.activePlayers.every(v => (v.turnBet === this.currentBet || v.broke) && v.playedTurn);
     }
 
     public get activePlayers() {
         return this.players.filter(p => !p.folded);
     }
 
+    public get agents() {
+        return this.players.filter(p => p.agent);
+    }
+
     private add(...cards: Card[]) {
         if((this.cards.length + cards.length) > 5) {
             throw new Error(`Cannot add ${cards.length} cards to board`);
         }
-        this.cards.concat(cards);
+        this.cards = this.cards.concat(cards);
     }
 
     public addPlayer(name: string) {
@@ -175,10 +175,8 @@ export class Board {
     }
 
     private dealFlop() {
-        console.log("attempting flop...")
         if(this.flopDone)
             return;
-        console.log("flopping!")
         for(let i = 0; i < FLOP; i++) {
             this.add(this.deck.draw());
         }
@@ -201,7 +199,6 @@ export class Board {
     }
 
     public dealBoard() {
-        console.log("dealing board")
         if(!this.flopDone)
             this.dealFlop();
         else if(!this.turnDone)
@@ -300,8 +297,9 @@ export class Board {
     public action(player: Player, action: Action, amount = 0) {
         let log = new Log();
         log.player = player.id;
-        log.round = this.round;
-        log.turn = this.turn.number;
+        log.currentBet = this.currentBet;
+        log.hand = player.hand.normalized;
+        log.cards = this.normalized;
         switch(action) {
         case Action.Fold:
             player.folded = true;
@@ -331,7 +329,6 @@ export class Board {
             log.amount = amount;
             break;
         }
-        this.log.push(log);
         player.playedTurn = true;
     }
 
@@ -339,15 +336,12 @@ export class Board {
         switch(this.state)
         {
             case RoundState.Waiting:
-                console.log("Starting round...");
                 this.startRound();
                 break;
             case RoundState.Finished:
-                console.log("Next round...");
                 this.startRound();
                 break;
             case RoundState.Started:
-                console.log("Playing...");
                 if(!this.current)
                     throw new Error("No Current player");
                 if(!action)
@@ -368,18 +362,24 @@ export class Board {
                 }
                 if(this.turnFinished && this.riverDone) {
                     // check for winner
-                    let winningHand = Solver.winners(this.activePlayers.map(s => s.solverHand));
+                    let playerContainer = this.activePlayers.map(p => {
+                        return {
+                            player: p,
+                            hand: p.solver() as Hand
+                        }
+                    });
+                    let winningHand = Hand.winners(playerContainer.map(s => s.hand));
                     if(!Array.isArray(winningHand)) {
                         winningHand = [winningHand];
                     }
                     for(const wh of winningHand) {
-                        let winningPlayer = this.activePlayers.find(p => p.solverHand === wh);
+                        let winningPlayer = playerContainer.find(p => p.hand === wh);
                         if(!winningPlayer) {
                             throw new Error("Cannot find winning player");
                         }
                         console.log(this.pot / winningHand.length);
-                        winningPlayer.money += (this.pot / winningHand.length);
-                        this.winner.push(this.findPlayer(winningPlayer));
+                        winningPlayer.player.money += (this.pot / winningHand.length);
+                        this.winner.push(this.findPlayer(winningPlayer.player));
                     }
                     this.pot = 0;
                     this.state = RoundState.Finished;
@@ -389,7 +389,6 @@ export class Board {
                 if(this.state !== RoundState.Finished) {
                     this.current = this.nextPlayer(this.current);
                     if(this.turnFinished) {
-                        console.log("Starting next turn!")
                         this.nextTurn();
                     }
                 }

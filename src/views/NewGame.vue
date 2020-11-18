@@ -47,15 +47,16 @@ export default class NewGame extends Vue {
         return !this.agents || !this.name || !this.gameName;
     }
 
-    private startGame() {
+    private async startGame() {
         const game = Game.create(this.gameName);
         game.board.addPlayer(this.name);
         for(let i = 0; i < this.agents; i++) {
             game.board.addAgent();
         }
-        game.save();
+        await game.save();
+        const loaded = await Game.load(game.id);
         // @ts-ignore
-        this.$router.push({ name: "Game", params: { game } });
+        this.$router.push({ name: "Game", params: { game: loaded } });
     }
 }
 </script>

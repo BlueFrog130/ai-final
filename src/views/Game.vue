@@ -19,6 +19,7 @@
             <div class="player" :style="{ height: size }">
                 <div class="controls">
                     <h2 :class="{ active: isTurn, winner: game.board.winner.includes(player.index) }" >{{ player.name }}</h2>
+                    <h4>{{ descr }}</h4>
                     <h4>${{ player.money }}</h4>
                     <button :disabled="started" @click="onDeal">Deal</button>
                     <button :disabled="!canCheck" @click="check">Check</button>
@@ -94,7 +95,7 @@ export default class GameComponent extends Vue {
         }, 1000);
     }
 
-    private onDestroy() {
+    private beforeDestroy() {
         window.removeEventListener("resize", this.setThird);
         window.removeEventListener("resize", this.setImgSize);
     }
@@ -105,6 +106,14 @@ export default class GameComponent extends Vue {
 
     private setImgSize() {
         this.imgSize = (this.$refs["deck"] as Community).imgHeight();
+    }
+
+    private get solver() {
+        return this.player?.solver();
+    }
+
+    private get descr() {
+        return this.solver?.descr;
     }
 
     @Watch("game.board.current")

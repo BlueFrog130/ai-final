@@ -1,6 +1,6 @@
 import { Board } from "./board"
 import * as uuid from "uuid"
-import { plainToClass, Transform } from "class-transformer"
+import { classToPlain, plainToClass, Transform } from "class-transformer"
 import { repository } from "@/database/database"
 import { Player } from './player';
 
@@ -37,7 +37,7 @@ export class Game {
         const dbBoard = <any> await repository.get(Board, dbGame.board);
         const dbPlayers = <any[]> await Promise.all(dbBoard.players.map((p: string) => repository.get(Player, p)));
         const players = plainToClass(Player, dbPlayers);
-        const board = new Board({ id: dbBoard.id, players, current: dbBoard.current, state: dbBoard.state, pot: dbBoard.pot, currentBet: dbBoard.currentBet, initialized: dbBoard.initialized, log: dbBoard.log, turn: dbBoard.turn, round: dbBoard.round, deck: dbBoard.deck, cards: dbBoard.cards });
+        const board = new Board({ id: dbBoard.id, players, current: dbBoard.current, state: dbBoard.state, pot: dbBoard.pot, currentBet: dbBoard.currentBet, initialized: dbBoard.initialized, turn: dbBoard.turn, round: dbBoard.round, deck: dbBoard.deck, cards: dbBoard.cards });
         return new Game({ id: dbGame.id, board, name: dbGame.name });
     }
 
@@ -53,6 +53,7 @@ export class Game {
             await this.delete();
         }
         let promises: Promise<any>[] = [];
+        this.board.agents.forEach(p => p.serializeNet());
         promises.push(repository.add(this), repository.add(this.board), ...this.board.players.map(p => repository.add(p)));
         await Promise.all(promises);
     }

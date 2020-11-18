@@ -1,8 +1,9 @@
 import { Board } from '@/models/board';
 import { Game } from '@/models/game';
+import { Log } from '@/models/log';
 import { Player } from '@/models/player';
-import { classToPlain } from 'class-transformer';
-import { clear } from 'console';
+import { INeuralNetworkJSON, NeuralNetwork } from "brain.js";
+import { classToPlain, plainToClass } from "class-transformer";
 import Vue from "vue"
 
 declare module "vue/types/vue" {
@@ -14,7 +15,7 @@ declare module "vue/types/vue" {
 let db: IDBDatabase | null = null;
 
 async function init() {
-    const request = indexedDB.open("PokerDatabase", 3);
+    const request = indexedDB.open("PokerDatabase", 5);
     await new Promise((res, rej) => {
         request.onerror = function(e) {
             console.error("No access to IndexedDB");
@@ -30,10 +31,21 @@ async function init() {
 
         request.onupgradeneeded = function(e) {
             db = <IDBDatabase> (e.target as any).result;
-            db.createObjectStore("games", { keyPath: "id" });
-            db.createObjectStore("boards", { keyPath: "id" });
-            db.createObjectStore("players", { keyPath: "id" });
-            return res();
+            if(e.oldVersion < 3) {
+                db.createObjectStore("games", { keyPath: "id" });
+                db.createObjectStore("boards", { keyPath: "id" });
+                db.createObjectStore("players", { keyPath: "id" });
+                return res();
+            }
+            if(e.oldVersion < 4) {
+                db.createObjectStore("data", { keyPath: "id", autoIncrement: true })
+            }
+            if(e.oldVersion < 5) {
+                db.createObjectStore("nets", { keyPath: "player" })
+            }
+            if(e.oldVersion < 6) {
+                db.deleteObjectStore("nets");
+            }
         }
     });
 
@@ -50,6 +62,8 @@ function getStore<T extends object>(item: T) {
             return "boards";
         case Player:
             return "players";
+        case Log:
+            return "data";
         default:
             throw new Error("Did not recognize item");
     }
@@ -63,6 +77,8 @@ function getStoreFromType(type: new(...args: any[]) => any) {
             return "boards";
         case Player:
             return "players";
+        case Log:
+            return "data";
         default:
             throw new Error("Did not recognize item");
     }
@@ -167,5 +183,53 @@ export const repository = {
                 return res();
             }
         })
+    },
+    async getBaseData() {
+        return new Promise<Log[]>((res, rej) => {
+            let req =  db?.transaction("data").objectStore("data").openCursor();
+            let baseData: Log[] = [];
+            if(req) {
+                req.onsuccess = function(e) {
+                    let cursor = (<any> e.target)?.result
+                    if(cursor) {
+                        let log = plainToClass(Log, cursor.value);
+                        if(!log.player) {
+                            baseData.push(log);
+                        }
+                        cursor.continue();
+                    }
+                    else {
+                        res(baseData);
+                    }
+                }
+            }
+            else {
+                return rej();
+            }
+        });
+    },
+    async getPlayerData(id: string) {
+        return new Promise<Log[]>((res, rej) => {
+            let req =  db?.transaction("data").objectStore("data").openCursor();
+            let data: Log[] = [];
+            if(req) {
+                req.onsuccess = function(e) {
+                    let cursor = (<any> e.target)?.result
+                    if(cursor) {
+                        let log = plainToClass(Log, cursor.value);
+                        if(log.player === id) {
+                            data.push(log);
+                        }
+                        cursor.continue();
+                    }
+                    else {
+                        res(data);
+                    }
+                }
+            }
+            else {
+                return rej();
+            }
+        });
     }
 }

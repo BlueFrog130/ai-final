@@ -12,14 +12,14 @@
             <button :disabled="!canCheck" @click="submit(actions.Check)">Check</button>
             <button :disabled="!canCall" @click="submit(actions.Call)">Call ${{ call }}</button>
             <button :disabled="!canFold" @click="submit(actions.Fold)">Fold</button>
-            <button :disabled="!canBet" @click="submit(actions.bet)">Bet ${{ amount }}</button>
-            <button :disabled="!canRaise" @click="submit(actions.raise)">Raise ${{ amount }}</button>
+            <button :disabled="!canBet" @click="submit(actions.Bet)">Bet ${{ amount }}</button>
+            <button :disabled="!canRaise" @click="submit(actions.Raise)">Raise ${{ amount }}</button>
             <div>
-                <input v-model="amount" type="range" :min="minRaise" :max="maxRaise">
+                <input v-model="amount" type="range" step="100" :min="minRaise" :max="maxRaise">
                 <span class="slider-label">{{ amount }}</span>
             </div>
         </div>
-        <div></div>
+        <h2>{{ solver ? solver.descr : "" }}</h2>
         <close />
     </div>
 </template>
@@ -31,7 +31,9 @@ import { Deck } from '@/models/deck'
 import { Vue, Component } from "vue-property-decorator";
 import CardSlot from "@/components/CardSlot.vue";
 import Close from "@/components/Close.vue";
-import pokersolver from "pokersolver";
+import { Hand } from "pokersolver";
+import { Log } from '@/models/log';
+import { repository } from '@/database/database';
 
 @Component({
     name: "Trainer",
@@ -45,7 +47,6 @@ export default class Trainer extends Vue {
 
     private created() {
         this.next();
-        console.log(pokersolver);
     }
 
     private deck = new Deck();
@@ -64,7 +65,7 @@ export default class Trainer extends Vue {
 
     private maxRaise = 0;
 
-    private solver: pokersolver.Hand | null = null;
+    private solver: Hand | null = null;
 
     private get canCheck() {
         return this.currentBet === 0;
@@ -89,19 +90,19 @@ export default class Trainer extends Vue {
     private get call() {
         return this.currentBet > this.money ? this.money : this.currentBet;
     }
-    
+
     private next() {
         this.money = this.getRandomInt(200, 3000);
-        this.currentBet = this.getRandomInt(0, 5) === 0 ? 0 : this.getRandomInt(100, 1000);
+        this.currentBet = this.getRandomInt(0, 5) === 0 ? 0 : this.getRandomInt(1, 10) * 100;
         this.deck = new Deck();
         this.hand = [this.deck.draw(), this.deck.draw()];
         this.community = [];
-        for(let i = 0, len = this.getRandomInt(3, 5); i < len; i++) {
+        for(let i = 0, len = this.random([0, 3, 4, 5]); i < len; i++) {
             this.community.push(this.deck.draw());
         }
         this.minRaise = this.currentBet * 2;
         this.maxRaise = this.money;
-        this.solver = pokersolver.solve([...this.hand.map(c => c.id), ...this.community.map(c => c.id)]);
+        this.solver = Hand.solve([...this.hand.map(c => c.id), ...this.community.map(c => c.id)]);
     }
 
     private getRandomInt(min: number, max: number) {
@@ -110,9 +111,21 @@ export default class Trainer extends Vue {
         return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
-    private submit(action: Action) {
-        console.log(Action[action]);
+    private random<T>(items: T[]) {
+        return items[Math.floor(Math.random() * items.length)];
+    }
+
+    private async submit(action: Action) {
+        let log = new Log();
+        log.player = null;
+        log.action = action;
+        log.amount = Number(this.amount);
+        log.currentBet = this.currentBet;
+        log.hand = this.hand.map(c => c.id);
+        log.cards = this.community.map(c => c.id);
+        await repository.add(log);
         this.next();
+        console.log(await repository.getBaseData());
     }
 }
 </script>

@@ -5,7 +5,13 @@ import { Hand } from './hand';
 import * as uuid from "uuid";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { Action } from './action';
-import Solver from "pokersolver"
+import { Hand as Solver } from "pokersolver"
+import { repository } from '@/database/database';
+import { Log } from './log';
+
+const CONFIG = {
+
+}
 
 export class Player {
     public id: string;
@@ -29,6 +35,11 @@ export class Player {
 
     @Type(() => Hand)
     public hand: Hand = new Hand();
+
+    @Exclude({ toPlainOnly: true })
+    private net: any = null;
+
+    private jsonNet: object | null = null;
 
     constructor(name: string, board: Board, agent = false, id?: string, localPlayer = false) {
         this.name = name;
@@ -75,7 +86,10 @@ export class Player {
         return this.board.currentBet - this.turnBet;
     }
 
-    public get solverHand() {
+    public solver() {
+        if(this.hand.normalized.length === 0) {
+            return undefined;
+        }
         return Solver.solve([...this.hand.normalized, ...this.board.normalized]);
     }
 
@@ -109,5 +123,43 @@ export class Player {
         this.turnBet = 0;
         this.playedTurn = false;
         this.folded = false;
+    }
+
+    // Loads data
+    public async initialize() {
+        console.log(`initalizing agent ${this.name}`)
+        this.net = new window.brain.recurrent.RNN();
+        if(this.jsonNet !== null) {
+            this.net.fromJSON(this.jsonNet);
+        }
+        else {
+            let base = await repository.getBaseData();
+            let data = base.map(l => l.toRnnTrainingData());
+            console.log(data);
+            this.net.train(data);
+        }
+        console.log(this.net);
+    }
+
+    public train() {
+        if(!this.agent) {
+            throw new Error("Cannot train a non-agent player");
+        }
+    }
+
+    public predict() {
+        if(!this.agent) {
+            throw new Error("Cannot predict action on a non-agent player");
+        }
+        let input = { currentBet: this.board.currentBet, hand: this.hand.normalized, cards: this.board.normalized };
+        console.log(input);
+        return Log.fromRnnData(this.net.run(input));
+    }
+
+    public serializeNet() {
+        if(this.net && this.net.weights) {
+            this.jsonNet = this.net.toJSON();
+            console.log(this.jsonNet);
+        }
     }
 }

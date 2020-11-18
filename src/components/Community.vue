@@ -7,8 +7,7 @@
             <card-slot ref="base" :cards="length" />
         </div>
         <template v-for="i in 5">
-            <card-slot outlined 
-            hide :key="i" />
+            <card-slot outlined :hide="cards[i - 1] === undefined" :cards="cards[i - 1]" :key="i" />
         </template>
     </div>
 </template>
@@ -16,13 +15,11 @@
 <script lang="ts">
 import { Board } from '@/models/board'
 import { Vue, Component, Prop } from "vue-property-decorator"
-import Card from "@/components/Card.vue"
 import CardSlot from "@/components/CardSlot.vue"
 
 @Component({
     name: "Community",
     components: {
-        Card,
         CardSlot
     }
 })
@@ -36,6 +33,10 @@ export default class community extends Vue {
 
     public imgHeight() {
         return (this.$refs["base"] as CardSlot).imgHeight();
+    }
+
+    public get cards() {
+        return this.board.cards;
     }
 }
 </script>
