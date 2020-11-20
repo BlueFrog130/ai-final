@@ -54,6 +54,7 @@ export class Game {
         }
         let promises: Promise<any>[] = [];
         this.board.agents.forEach(p => p.serializeNet());
+        this.board.players.forEach(p => p.cleanup());
         promises.push(repository.add(this), repository.add(this.board), ...this.board.players.map(p => repository.add(p)));
         await Promise.all(promises);
     }

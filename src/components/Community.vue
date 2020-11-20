@@ -1,14 +1,21 @@
 <template>
     <div class="community">
-        <h2>
-            ${{ board.pot }}
-        </h2>
-        <div>
-            <card-slot ref="base" :cards="length" />
+        <div class="row">
+            <h3>
+                ${{ board.pot }}
+            </h3>
+            <h3 v-if="winnerText">
+                {{ winnerText }}
+            </h3>
         </div>
-        <template v-for="i in 5">
-            <card-slot outlined :hide="cards[i - 1] === undefined" :cards="cards[i - 1]" :key="i" />
-        </template>
+        <div class="row">
+            <div>
+                <card-slot ref="base" :cards="length" />
+            </div>
+            <template v-for="i in 5">
+                <card-slot outlined :hide="cards[i - 1] === undefined" :cards="cards[i - 1]" :key="i" flipped />
+            </template>
+        </div>
     </div>
 </template>
 
@@ -38,6 +45,19 @@ export default class community extends Vue {
     public get cards() {
         return this.board.cards;
     }
+
+    public get winnerText() {
+        if(this.board.winner.length === 0) {
+            return undefined;
+        }
+        const names = this.board.winner.map(v => this.board.getPlayer(v).name);
+        let str = "";
+        for(const name of names) {
+            str += `${name},`
+        }
+        str = `${str.slice(0, -1)} won with ${this.board.winningDescr}`;
+        return str;
+    }
 }
 </script>
 
@@ -46,11 +66,17 @@ export default class community extends Vue {
     height: 100%;
     width: 90%;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    & > *:not(:last-child) {
-        margin-right: 10px;
+    > .row {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        & > *:not(:last-child) {
+            margin-right: 10px;
+        }
     }
 }
 </style>

@@ -1,43 +1,80 @@
 import { Action } from './action';
+import { Player } from './player';
+
+interface opts {
+    action: Action
+    player?: string | Player
+    amount: number
+    currentBet: number
+    ehs: number
+}
 
 export class Log {
-    public player: string | null = null;
+    public player: string | null;
 
-    public action: Action = Action.Unknown;
+    constructor({ action, player, amount, currentBet, ehs }: opts) {
+        if(player) {
+            this.player = player instanceof Player ? player.id : player;
+        }
+        else {
+            this.player = null;
+        }
 
-    public amount = 0;
+        switch(action) {
+            case Action.Check:
+                this.check = 1;
+                break;
+            case Action.Call:
+                this.call = 1;
+                break;
+            case Action.Bet:
+                this.bet = 1;
+                break;
+            case Action.Raise:
+                this.raise = 1;
+                break;
+            case Action.Fold:
+                this.fold = 1;
+                break;
+        }
 
-    public currentBet = 0;
+        this.amount = amount;
+        this.currentBet = currentBet;
+        this.ehs = ehs;
+    }
 
-    public hand: string[] = [];
+    private check = 0;
 
-    public cards: string[] = [];
+    private call = 0;
+
+    private bet = 0;
+
+    private raise = 0;
+
+    private fold = 0;
+
+    /** ratio amount to money */
+    public amount;
+
+    /** ratio of current bet to money */
+    public currentBet;
+
+    public ehs;
 
     public toTrainingData() {
         return {
             input: {
                 currentBet: this.currentBet,
-                hand: this.hand,
-                cards: this.cards
+                ehs: this.ehs,
             },
             output: {
-                action: this.action,
+                check: this.check,
+                call: this.call,
+                bet: this.bet,
+                raise: this.raise,
+                fold: this.fold,
                 amount: this.amount
             }
-        }
-    }
-
-    public toRnnTrainingData() {
-        return {
-            input: [this.currentBet, this.hand, this.cards],
-            output: [this.action, this.amount]
-        }
-    }
-
-    public static fromRnnData([action, amount]: [number, number]) {
-        return {
-            action,
-            amount
         }
     }
 }

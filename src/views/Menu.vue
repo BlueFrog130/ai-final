@@ -14,6 +14,10 @@
 <script lang="ts">
 import { Vue, Component } from "vue-property-decorator"
 import { Game } from "@/models/game"
+import { Player } from '@/models/player';
+import { Combination } from "js-combinatorics"
+import { Deck } from '@/models/deck';
+import { Generator } from '@/helpers/generator';
 
 @Component({
     name: "Menu"

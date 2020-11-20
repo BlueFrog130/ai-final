@@ -34,6 +34,8 @@ import Close from "@/components/Close.vue";
 import { Hand } from "pokersolver";
 import { Log } from '@/models/log';
 import { repository } from '@/database/database';
+import StrengthWorker from "worker-loader!@/workers/strength";
+import PotentialWorker from "worker-loader!@/workers/potential";
 
 @Component({
     name: "Trainer",
@@ -67,6 +69,12 @@ export default class Trainer extends Vue {
 
     private solver: Hand | null = null;
 
+    private strengthWorker = new StrengthWorker();
+
+    private potentialWorker = new PotentialWorker();
+
+    private players = 0;
+
     private get canCheck() {
         return this.currentBet === 0;
     }
@@ -97,6 +105,7 @@ export default class Trainer extends Vue {
         this.deck = new Deck();
         this.hand = [this.deck.draw(), this.deck.draw()];
         this.community = [];
+        this.players = this.random([2,3,4,5]);
         for(let i = 0, len = this.random([0, 3, 4, 5]); i < len; i++) {
             this.community.push(this.deck.draw());
         }
@@ -116,16 +125,45 @@ export default class Trainer extends Vue {
     }
 
     private async submit(action: Action) {
-        let log = new Log();
-        log.player = null;
-        log.action = action;
-        log.amount = Number(this.amount);
-        log.currentBet = this.currentBet;
-        log.hand = this.hand.map(c => c.id);
-        log.cards = this.community.map(c => c.id);
+        const amount = (this.amount / this.money) > 1 ? 1 : (this.amount / this.money);
+        const currentBet = (this.currentBet / this.money) > 1 ? 1 : (this.currentBet / this.money);
+        const ehs = await this.effectiveHandStrength();
+        let log = new Log({ action, amount, currentBet, ehs });
         await repository.add(log);
         this.next();
-        console.log(await repository.getBaseData());
+    }
+
+    public async effectiveHandStrength() {
+        const HS = await this.getHandStrength();
+        if(this.community.length < 3) {
+            return HS;
+        }
+        const potential = await this.getHandPotential();
+        return HS * (1 - potential.NPot) + (1 - HS) * potential.PPot;
+    }
+
+    public getHandStrength() {
+        return new Promise<number>((resolve, reject) => {
+            this.strengthWorker.postMessage({ hand: this.hand, board: this.community })
+            this.strengthWorker.onmessage = e => {
+                return resolve(Math.pow(e.data, this.players - 1));
+            }
+            this.strengthWorker.onerror = e => {
+                return reject(e);
+            }
+        })
+    }
+
+    public getHandPotential() {
+        return new Promise<any>((resolve, reject) => {
+            this.potentialWorker.postMessage({ hand: this.hand, board: this.community })
+            this.potentialWorker.onmessage = e => {
+                return resolve(e.data);
+            }
+            this.potentialWorker.onerror = e => {
+                return reject(e);
+            }
+        })
     }
 }
 </script>

@@ -6,8 +6,9 @@ import * as uuid from "uuid";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { Action } from './action';
 import { Hand as Solver } from "pokersolver"
-import { repository } from '@/database/database';
 import { Log } from './log';
+import StrengthWorker from "worker-loader!@/workers/strength";
+import PotentialWorker from "worker-loader!@/workers/potential";
 
 const CONFIG = {
 
@@ -36,10 +37,16 @@ export class Player {
     @Type(() => Hand)
     public hand: Hand = new Hand();
 
-    @Exclude({ toPlainOnly: true })
+    @Exclude()
     private net: any = null;
 
     private jsonNet: object | null = null;
+
+    @Exclude()
+    private strengthWorker = new StrengthWorker();
+
+    @Exclude()
+    private potentialWorker = new PotentialWorker();
 
     constructor(name: string, board: Board, agent = false, id?: string, localPlayer = false) {
         this.name = name;
@@ -94,11 +101,11 @@ export class Player {
     }
 
     public get index() {
-        return this.board.findPlayer(this);
+        return this.board.findPlayerIndex(this);
     }
 
     public get activeIndex() {
-        return this.board.findActivePlayer(this);
+        return this.board.findActivePlayerIndex(this);
     }
 
     public deal(card: Card) {
@@ -128,17 +135,16 @@ export class Player {
     // Loads data
     public async initialize() {
         console.log(`initalizing agent ${this.name}`)
-        this.net = new window.brain.recurrent.RNN();
-        if(this.jsonNet !== null) {
-            this.net.fromJSON(this.jsonNet);
-        }
-        else {
-            let base = await repository.getBaseData();
-            let data = base.map(l => l.toRnnTrainingData());
-            console.log(data);
-            this.net.train(data);
-        }
-        console.log(this.net);
+        this.net = new window.brain.NeuralNetworkGPU();
+        // if(this.jsonNet !== null) {
+        //     this.net.fromJSON(this.jsonNet);
+        // }
+        // else {
+        //     let base = await repository.getBaseData();
+        //     let data = base.map(l => l.toRnnTrainingData());
+        //     console.log(data);
+        //     this.net.train(data);
+        // }
     }
 
     public train() {
@@ -161,5 +167,46 @@ export class Player {
             this.jsonNet = this.net.toJSON();
             console.log(this.jsonNet);
         }
+    }
+
+    public async effectiveHandStrength() {
+        const HS = await this.getHandStrength();
+        if(!this.board.flopDone) {
+            return HS;
+        }
+        const potential = await this.getHandPotential();
+        return HS * (1 - potential.NPot) + (1 - HS) * potential.PPot;
+    }
+
+    public getHandStrength() {
+        return new Promise<number>((resolve, reject) => {
+            this.strengthWorker.postMessage({ hand: this.hand.normalized, board: this.board.normalized })
+            this.strengthWorker.onmessage = e => {
+                return resolve(Math.pow(e.data, this.board.players.length - 1));
+            }
+            this.strengthWorker.onerror = e => {
+                return reject(e);
+            }
+        })
+    }
+
+    public getHandPotential() {
+        return new Promise<any>((resolve, reject) => {
+            this.potentialWorker.postMessage({ hand: this.hand.normalized, board: this.board.normalized })
+            this.potentialWorker.onmessage = e => {
+                return resolve(e.data);
+            }
+            this.potentialWorker.onerror = e => {
+                return reject(e);
+            }
+        })
+    }
+
+    /**
+     * Terminates workers
+     */
+    public cleanup() {
+        this.strengthWorker.terminate();
+        this.potentialWorker.terminate();
     }
 }

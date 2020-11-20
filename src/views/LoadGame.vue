@@ -70,7 +70,7 @@ export default class LoadGame extends Vue {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: space-around;
 }
 
 .game-display {

@@ -15,7 +15,7 @@ declare module "vue/types/vue" {
 let db: IDBDatabase | null = null;
 
 async function init() {
-    const request = indexedDB.open("PokerDatabase", 5);
+    const request = indexedDB.open("PokerDatabase", 7);
     await new Promise((res, rej) => {
         request.onerror = function(e) {
             console.error("No access to IndexedDB");
@@ -45,6 +45,9 @@ async function init() {
             }
             if(e.oldVersion < 6) {
                 db.deleteObjectStore("nets");
+            },
+            if(e.oldVersion < 7) {
+                db.transaction("data").objectStore("data").clear();
             }
         }
     });

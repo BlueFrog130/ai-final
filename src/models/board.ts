@@ -75,6 +75,8 @@ export class Board {
 
     public winner: number[] = [];
 
+    public winningDescr = "";
+
     constructor(opts?: { id: string, players?: Player[], current?: string, state?: number, pot?: number, currentBet?: number, initialized?: boolean, turn?: Turn, round?: number, cards?: Card[], deck?: Deck; }) {
         if(opts) {
             this.id = opts.id;
@@ -127,15 +129,15 @@ export class Board {
         return new Board({ id: uuid.v4() });
     }
 
-    private get flopDone() {
+    public get flopDone() {
         return this.cards.length >= 3;
     }
 
-    private get turnDone() {
+    public get turnDone() {
         return this.cards.length >= 4;
     }
 
-    private get riverDone() {
+    public get riverDone() {
         return this.cards.length == 5;
     }
 
@@ -177,6 +179,7 @@ export class Board {
     private dealFlop() {
         if(this.flopDone)
             return;
+        console.log("dealing flop");
         for(let i = 0; i < FLOP; i++) {
             this.add(this.deck.draw());
         }
@@ -185,6 +188,7 @@ export class Board {
     private dealTurn() {
         if(this.turnDone)
             return;
+        console.log("dealing turn");
         for(let i = 0; i < TURN; i++) {
             this.add(this.deck.draw())
         }
@@ -193,6 +197,7 @@ export class Board {
     private dealRiver() {
         if(this.riverDone)
             return;
+        console.log("dealing river");
         for(let i = 0; i < RIVER; i++) {
             this.add(this.deck.draw())
         }
@@ -224,11 +229,11 @@ export class Board {
         this.initialized = true;
     }
 
-    private getPlayer(player: number) {
+    public getPlayer(player: number) {
         return this.players[player];
     }
 
-    public findPlayer(player: Player) {
+    public findPlayerIndex(player: Player) {
         for(let i = 0, l = this.players.length; i < l; i++) {
             if(player === this.players[i]) {
                 return i;
@@ -237,7 +242,7 @@ export class Board {
         return -1;
     }
 
-    public findActivePlayer(player: Player) {
+    public findActivePlayerIndex(player: Player) {
         for(let i = 0, l = this.activePlayers.length; i < l; i++) {
             if(player === this.activePlayers[i]) {
                 return i;
@@ -247,18 +252,19 @@ export class Board {
     }
 
     private nextPlayer(player: Player | number): Player {
-        let idx = typeof player === "number" ? player : this.findActivePlayer(player);
+        let idx = typeof player === "number" ? player : this.findActivePlayerIndex(player);
         let p = this.activePlayers[(idx + 1) % this.activePlayers.length];
         return p;
     }
 
     public startRound() {
-        console.log(this);
         this.round++;
         this.pot = 0;
         this.turn.number = 1;
         this.winner = [];
+        this.winningDescr = "";
         this.deck.reset();
+        this.cards = [];
         this.players.forEach(p => p.reset());
 
         if(!this.initialized) {
@@ -295,6 +301,9 @@ export class Board {
     }
 
     public action(player: Player, action: Action, amount = 0) {
+        if(!player.actions.includes(action)) {
+            throw new Error(`Not allowed to ${Action[action]}`);
+        }
         let log = new Log();
         log.player = player.id;
         log.currentBet = this.currentBet;
@@ -351,7 +360,7 @@ export class Board {
                 // Win conditions
                 if(this.activePlayers.length === 1) {
                     let winningPlayer = this.activePlayers[0];
-                    let winningIndex = this.findPlayer(winningPlayer);
+                    let winningIndex = this.findPlayerIndex(winningPlayer);
                     if(winningIndex === -1) {
                         throw new Error("No winner??");
                     }
@@ -377,10 +386,10 @@ export class Board {
                         if(!winningPlayer) {
                             throw new Error("Cannot find winning player");
                         }
-                        console.log(this.pot / winningHand.length);
                         winningPlayer.player.money += (this.pot / winningHand.length);
-                        this.winner.push(this.findPlayer(winningPlayer.player));
+                        this.winner.push(this.findPlayerIndex(winningPlayer.player));
                     }
+                    this.winningDescr = winningHand[0].descr;
                     this.pot = 0;
                     this.state = RoundState.Finished;
                 }

@@ -1,8 +1,12 @@
+import "reflect-metadata"
+import { Type } from 'class-transformer';
 import { Card } from './card';
 import { Suit } from './suit';
 import { Value } from './value';
 
 export class Deck {
+
+    @Type(() => Card)
     private deck: Array<Card> = [];
 
     public constructor() {
@@ -28,6 +32,10 @@ export class Deck {
         this.shuffle();
     }
 
+    public get normalized() {
+        return this.deck.map(c => c.id);
+    }
+
     /**
      * Shuffles deck
      */
@@ -43,6 +51,10 @@ export class Deck {
      */
     public draw() {
         return this.deck.splice(0, 1)[0];
+    }
+
+    public peak() {
+        return this.deck.slice(0, 1)[0];
     }
 
     /**
