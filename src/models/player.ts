@@ -6,9 +6,11 @@ import * as uuid from "uuid";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { Action } from './action';
 import { Hand as Solver } from "pokersolver"
-import { Log } from './log';
 import StrengthWorker from "worker-loader!@/workers/strength";
 import PotentialWorker from "worker-loader!@/workers/potential";
+import { Log, Output } from './log';
+import { repository } from '@/database/database';
+import brain from "brain.js"
 
 const CONFIG = {
 
@@ -43,10 +45,17 @@ export class Player {
     private jsonNet: object | null = null;
 
     @Exclude()
-    private strengthWorker = new StrengthWorker();
+    private strengthWorker?: StrengthWorker = undefined;
 
     @Exclude()
-    private potentialWorker = new PotentialWorker();
+    private potentialWorker?: PotentialWorker = undefined;
+
+    @Type(() => Log)
+    public roundLog: Log[] = [];
+
+    public initalizing = true;
+
+    public retraining = false;
 
     constructor(name: string, board: Board, agent = false, id?: string, localPlayer = false) {
         this.name = name;
@@ -54,6 +63,9 @@ export class Player {
         this.agent = agent;
         this.id = id || uuid.v4();
         this.localPlayer = localPlayer;
+        if(!this.agent) {
+            this.initalizing = false;
+        }
     }
 
     public static create(name: string, board: Board) {
@@ -130,42 +142,61 @@ export class Player {
         this.turnBet = 0;
         this.playedTurn = false;
         this.folded = false;
+        this.roundLog = [];
     }
 
     // Loads data
-    public async initialize() {
-        console.log(`initalizing agent ${this.name}`)
-        this.net = new window.brain.NeuralNetworkGPU();
-        // if(this.jsonNet !== null) {
-        //     this.net.fromJSON(this.jsonNet);
-        // }
-        // else {
-        //     let base = await repository.getBaseData();
-        //     let data = base.map(l => l.toRnnTrainingData());
-        //     console.log(data);
-        //     this.net.train(data);
-        // }
-    }
-
-    public train() {
+    public initialize() {
         if(!this.agent) {
-            throw new Error("Cannot train a non-agent player");
+            throw new Error("Cannot initialize a non-agent player");
         }
+        this.strengthWorker = new StrengthWorker();
+        this.potentialWorker = new PotentialWorker();
+        this.net = window.makeNeuralNet();
+        if(this.jsonNet !== null) {
+            this.net.fromJSON(this.jsonNet);
+        }
+        else {
+            this.train();
+        }
+        this.initalizing = false;
     }
 
-    public predict() {
+    /**
+     * Adds training data if agent wins
+     */
+    public async retrain() {
+        // if(!this.agent) {
+        //     throw new Error("Cannot train a non-agent player");
+        // }
+        // this.retraining = true;
+        // await repository.addData(this.roundLog);
+        // this.train();
+        // this.retraining = false;
+    }
+
+    private async train() {
+        const data = await repository.getBaseData();
+        this.net.train(data.map(d => d.toTrainingData()));
+    }
+
+    public async predict() {
         if(!this.agent) {
             throw new Error("Cannot predict action on a non-agent player");
         }
-        let input = { currentBet: this.board.currentBet, hand: this.hand.normalized, cards: this.board.normalized };
-        console.log(input);
-        return Log.fromRnnData(this.net.run(input));
+        const currentBet = (this.board.currentBet / this.money) > 1 ? 1 : (this.board.currentBet / this.money);
+        const ehs = await this.effectiveHandStrength();
+        let input = { currentBet, ehs };
+        const output = this.net.run(input) as Output;
+        return {
+            input: { currentBet, ehs },
+            output
+        };
     }
 
     public serializeNet() {
         if(this.net && this.net.weights) {
             this.jsonNet = this.net.toJSON();
-            console.log(this.jsonNet);
         }
     }
 
@@ -180,6 +211,9 @@ export class Player {
 
     public getHandStrength() {
         return new Promise<number>((resolve, reject) => {
+            if(!this.strengthWorker) {
+                return reject("Strength worker is not initialized")
+            }
             this.strengthWorker.postMessage({ hand: this.hand.normalized, board: this.board.normalized })
             this.strengthWorker.onmessage = e => {
                 return resolve(Math.pow(e.data, this.board.players.length - 1));
@@ -192,6 +226,9 @@ export class Player {
 
     public getHandPotential() {
         return new Promise<any>((resolve, reject) => {
+            if(!this.potentialWorker) {
+                return reject("Strength worker is not initialized")
+            }
             this.potentialWorker.postMessage({ hand: this.hand.normalized, board: this.board.normalized })
             this.potentialWorker.onmessage = e => {
                 return resolve(e.data);
@@ -206,7 +243,48 @@ export class Player {
      * Terminates workers
      */
     public cleanup() {
-        this.strengthWorker.terminate();
-        this.potentialWorker.terminate();
+        this.strengthWorker?.terminate();
+        this.potentialWorker?.terminate();
+    }
+
+    public async getAction() {
+        if(!this.agent) {
+            throw new Error("Cannot get predicted action on a non-agent");
+        }
+        const { input, output } = await this.predict();
+        console.log(`${this.name} confidence values`, { input, output });
+        // get confidence intervals for available actions
+        const intervals = this.actions.map(action => {
+            switch(action) {
+                case Action.Check:
+                    return { action, confidence: output.check };
+                case Action.Call:
+                    return { action, confidence: output.call };
+                case Action.Bet:
+                    return { action, confidence: output.bet };
+                case Action.Raise:
+                    return { action, confidence: output.raise };
+                case Action.Fold:
+                    return { action, confidence: output.fold };
+                default:
+                    return { action: Action.Unknown, confidence: -1 };
+            }
+        });
+        const best = intervals.reduce((prev, current) => (prev.confidence > current.confidence) ? prev : current);
+        const final = { action: best.action, amount: Math.round(output.amount * this.money) };
+        if((best.action === Action.Raise || best.action === Action.Bet) && final.amount < this.minRaise) {
+            console.log("Agent-defined amount is less than min betting amount")
+            if(this.actions.includes(Action.Fold)) {
+                best.action = Action.Fold;
+            }
+            else {
+                best.action = Action.Check;
+            }
+        }
+        if(isNaN(final.amount)) {
+            final.amount = 0;
+        }
+        this.roundLog.push(new Log({ player: this, action: final.action, amount: final.amount, total: this.money, currentBet: this.board.currentBet, ehs: input.ehs }));
+        return final;
     }
 }

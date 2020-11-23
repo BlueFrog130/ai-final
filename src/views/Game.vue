@@ -1,6 +1,9 @@
 <template>
     <div ref="game" class="game">
         <close :game="game" />
+        <div class="overlay" v-if="loading">
+            <h2>Loading...</h2>
+        </div>
         <div :class="{ void: loading }" class="play-area">
             <div class="opponents" :style="{ height: size }">
                 <template v-for="agent in agents">
@@ -9,14 +12,14 @@
                             <h4 :class="{ active: agent === game.board.current, winner: game.board.winner.includes(agent.index) }" >{{ agent.name }}</h4>
                             <h6>${{ agent.money }}</h6>
                         </div>
-                        <hand reverse :player="agent" :hide="game.board.state !== 2" :height="imgSize" />
+                        <hand reverse :player="agent" :hide="game.board.state !== 2 && !game.cheat" :height="imgSize" />
                     </div>
                 </template>
             </div>
             <div class="community" :style="{ height: size }">
                 <community ref="deck" :board="game.board" />
             </div>
-            <div class="player" :style="{ height: size }">
+            <div v-if="player" class="player" :style="{ height: size }">
                 <div class="controls">
                     <h2 :class="{ active: isTurn, winner: game.board.winner.includes(player.index) }" >{{ player.name }}</h2>
                     <h4>{{ descr }}</h4>
@@ -25,10 +28,10 @@
                     <button :disabled="!canCheck" @click="check">Check</button>
                     <button :disabled="!canCall" @click="call">Call ${{ player.call }}</button>
                     <button :disabled="!canFold" @click="fold">Fold</button>
-                    <button :disabled="!canBet" @click="amount">Bet ${{ amount }}</button>
+                    <button :disabled="!canBet" @click="bet">Bet ${{ amount }}</button>
                     <button :disabled="!canRaise" @click="raise">Raise ${{ amount }}</button>
                     <div>
-                        <input v-model="amount" type="range" :min="player.minRaise" :max="player.maxRaise">
+                        <input v-model="amount" type="range" :min="player.minRaise" :max="player.maxRaise" step="50">
                         <span class="slider-label">{{ amount }}</span>
                     </div>
                 </div>
@@ -75,10 +78,6 @@ export default class GameComponent extends Vue {
 
     private created() {
         this.player = this.game.board.players.find(p => p.localPlayer) || null;
-        if(!this.player) {
-            throw new Error("Cannot find local player");
-        }
-
         console.log(this.game);
     }
 
@@ -118,6 +117,8 @@ export default class GameComponent extends Vue {
 
     @Watch("game.board.current")
     private onPlayerChange() {
+        if(!this.player)
+            return;
         this.amount = ((this.player as Player).maxRaise + (this.player as Player).minRaise) / 4;
     }
 
@@ -146,7 +147,7 @@ export default class GameComponent extends Vue {
     }
 
     private get canBet() {
-        return this.isTurn && this.player?.actions.includes(Action.Bet);
+        return this.isTurn && this.player?.actions.includes(Action.Bet) && (this.amount >= this.game.board.currentBet * 2) && this.amount > 0;
     }
 
     private get canRaise() {
@@ -158,23 +159,33 @@ export default class GameComponent extends Vue {
     }
 
     private check() {
-        this.game.board.play({ action: Action.Check });
+        if(!this.player)
+            throw new Error("Missing player");
+        this.game.board.play({ action: Action.Check, player: this.player, amount: this.amount });
     }
 
     private call() {
-        this.game.board.play({ action: Action.Call });
+        if(!this.player)
+            throw new Error("Missing player");
+        this.game.board.play({ action: Action.Call, player: this.player, amount: this.amount });
     }
 
     private raise() {
-        this.game.board.play({ action: Action.Raise, amount: this.amount });
+        if(!this.player)
+            throw new Error("Missing player");
+        this.game.board.play({ action: Action.Raise, player: this.player, amount: Number(this.amount) });
     }
 
     private bet() {
-        this.game.board.play({ action: Action.Bet, amount: this.amount });
+        if(!this.player)
+            throw new Error("Missing player");
+        this.game.board.play({ action: Action.Bet, player: this.player, amount: Number(this.amount) });
     }
 
     private fold() {
-        this.game.board.play({ action: Action.Fold });
+        if(!this.player)
+            throw new Error("Missing player");
+        this.game.board.play({ action: Action.Fold, player: this.player, amount: this.amount });
     }
 }
 </script>
@@ -255,5 +266,14 @@ export default class GameComponent extends Vue {
 
 .winner {
     color: rgb(0, 211, 0);
+}
+
+.overlay {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 </style>

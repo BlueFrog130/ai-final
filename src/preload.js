@@ -1,3 +1,5 @@
-const Brain = require("brain.js");
+const brain = require("brain.js");
 
-window.Brain = Brain.default;
+window.makeNeuralNet = function() {
+    return new brain.default.NeuralNetworkGPU();
+}

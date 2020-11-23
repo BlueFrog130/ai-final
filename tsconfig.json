@@ -36,7 +36,9 @@
     "src/**/*.tsx",
     "src/**/*.vue",
     "tests/**/*.ts",
-    "tests/**/*.tsx", "src/preload.js"
+    "tests/**/*.tsx",
+    "src/preload.js",
+    "src/neural.js"
   ],
   "exclude": [
     "node_modules"

@@ -1,6 +1,6 @@
 import { Board } from "./board"
 import * as uuid from "uuid"
-import { classToPlain, plainToClass, Transform } from "class-transformer"
+import { plainToClass, Transform } from "class-transformer"
 import { repository } from "@/database/database"
 import { Player } from './player';
 
@@ -9,22 +9,30 @@ export class Game {
 
     public name: string = "";
 
+    public cheat: boolean = false;
+    
+    public autoTrain: boolean = false;
+
     @Transform((value: Board) => value.id, { toPlainOnly: true })
     public board!: Board;
 
-    public static create(name: string) {
+    public static create(name: string, cheat = false, autoTrain = false) {
         let game = new Game();
         game.id = uuid.v4();
         game.name = name;
-        game.board = Board.create();
+        game.autoTrain = autoTrain;
+        game.cheat = cheat;
+        game.board = Board.create(autoTrain);
         return game;
     }
 
-    constructor(opts?: { id: string, board: Board, name: string }) {
+    constructor(opts?: { id: string, board: Board, name: string, autoTrain: boolean, cheat: boolean }) {
         if(opts) {
             this.id = opts.id;
             this.name = opts.name
             this.board = opts.board;
+            this.cheat = opts.cheat;
+            this.autoTrain = opts.autoTrain;
         }
     }
 
@@ -37,12 +45,14 @@ export class Game {
         const dbBoard = <any> await repository.get(Board, dbGame.board);
         const dbPlayers = <any[]> await Promise.all(dbBoard.players.map((p: string) => repository.get(Player, p)));
         const players = plainToClass(Player, dbPlayers);
-        const board = new Board({ id: dbBoard.id, players, current: dbBoard.current, state: dbBoard.state, pot: dbBoard.pot, currentBet: dbBoard.currentBet, initialized: dbBoard.initialized, turn: dbBoard.turn, round: dbBoard.round, deck: dbBoard.deck, cards: dbBoard.cards });
-        return new Game({ id: dbGame.id, board, name: dbGame.name });
+        players.filter(p => p.agent).forEach(p => p.initialize());
+        const board = new Board({ id: dbBoard.id, players, current: dbBoard.current, state: dbBoard.state, pot: dbBoard.pot, currentBet: dbBoard.currentBet, initialized: dbBoard.initialized, turn: dbBoard.turn, round: dbBoard.round, deck: dbBoard.deck, cards: dbBoard.cards, autoPlay: dbBoard.autoPlay });
+        return new Game({ id: dbGame.id, board, name: dbGame.name, cheat: dbGame.cheat, autoTrain: dbGame.autoTrain });
     }
 
     public async delete() {
         let removing: Promise<any>[] = [];
+        this.board.players.forEach(p => p.cleanup());
         removing.push(repository.delete(this), repository.delete(this.board), ...this.board.players.map(p => repository.delete(p)));
         return await Promise.all(removing);
     }

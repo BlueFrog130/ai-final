@@ -7,12 +7,35 @@ interface opts {
     amount: number
     currentBet: number
     ehs: number
+    total: number
+}
+
+export interface Input {
+    currentBet: number
+    ehs: number
+}
+
+export interface Output {
+    check: number
+    call: number
+    bet: number
+    raise: number
+    fold: number
+    amount: number
 }
 
 export class Log {
     public player: string | null;
 
-    constructor({ action, player, amount, currentBet, ehs }: opts) {
+    constructor(options: opts) {
+        if(!options) {
+            this.player = null;
+            this.amount = 0;
+            this.currentBet = 0;
+            this.ehs = 0
+            return;
+        }
+        const { action, player, amount, currentBet, ehs, total } = options;
         if(player) {
             this.player = player instanceof Player ? player.id : player;
         }
@@ -38,8 +61,8 @@ export class Log {
                 break;
         }
 
-        this.amount = amount;
-        this.currentBet = currentBet;
+        this.amount = (amount / total) > 1 ? 1 : amount / total;
+        this.currentBet = (currentBet / total) > 1 ? 1 : currentBet / total;
         this.ehs = ehs;
     }
 
@@ -54,14 +77,14 @@ export class Log {
     private fold = 0;
 
     /** ratio amount to money */
-    public amount;
+    public amount: number;
 
     /** ratio of current bet to money */
-    public currentBet;
+    public currentBet: number;
 
-    public ehs;
+    public ehs: number;
 
-    public toTrainingData() {
+    public toTrainingData(): { input: Input, output: Output } {
         return {
             input: {
                 currentBet: this.currentBet,

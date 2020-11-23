@@ -1,7 +1,10 @@
 module.exports = {
     pluginOptions: {
         electronBuilder: {
-            preload: "src/preload.js"
+            preload: {
+                preload: "src/preload.js",
+            },
+            nodeIntegration: false
         }
     },
     chainWebpack: config => {

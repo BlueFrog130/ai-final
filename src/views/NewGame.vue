@@ -5,9 +5,17 @@
             <label for="name">Game Name</label>
             <input v-model="gameName" id="game" placeholder="Name">
         </div>
-        <div>
+        <!-- <div>
+            <label type="checkbox" for="auto">Auto-train [Bots only]</label>
+            <input v-model="autoTrain" type="checkbox" id="auto">
+        </div> -->
+        <div v-if="!autoTrain">
             <label for="name">Display Name</label>
             <input v-model="name" id="name" placeholder="Name">
+        </div>
+        <div>
+            <label type="checkbox" for="cheat">Cheat Mode [View Cards]</label>
+            <input v-model="cheat" type="checkbox" id="cheat">
         </div>
         <div>
             <div class="selection">
@@ -39,17 +47,23 @@ export default class NewGame extends Vue {
 
     private gameName = "";
 
+    private cheat = false;
+
+    private autoTrain = false;
+
     private readonly MAX_AGENTS = 5;
 
     private agents = 0;
 
     private get disabled() {
-        return !this.agents || !this.name || !this.gameName;
+        return !this.agents || (!this.name && !this.autoTrain) || !this.gameName;
     }
 
     private async startGame() {
-        const game = Game.create(this.gameName);
-        game.board.addPlayer(this.name);
+        const game = Game.create(this.gameName, this.cheat, this.autoTrain);
+        if(!this.autoTrain) {
+            game.board.addPlayer(this.name);
+        }
         for(let i = 0; i < this.agents; i++) {
             game.board.addAgent();
         }
@@ -83,6 +97,10 @@ export default class NewGame extends Vue {
         margin-bottom: 0.5em;
         &[type=radio] {
             display: inline-block;
+        }
+        &[type=checkbox] {
+            display: inline-block;
+            margin-right: 0.5rem;
         }
     }
     > *:not(:last-child) {

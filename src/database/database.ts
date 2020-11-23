@@ -19,7 +19,6 @@ async function init() {
     await new Promise((res, rej) => {
         request.onerror = function(e) {
             console.error("No access to IndexedDB");
-            console.log(e);
             db = null;
             return rej(e);
         }
@@ -35,20 +34,11 @@ async function init() {
                 db.createObjectStore("games", { keyPath: "id" });
                 db.createObjectStore("boards", { keyPath: "id" });
                 db.createObjectStore("players", { keyPath: "id" });
-                return res();
             }
             if(e.oldVersion < 4) {
                 db.createObjectStore("data", { keyPath: "id", autoIncrement: true })
             }
-            if(e.oldVersion < 5) {
-                db.createObjectStore("nets", { keyPath: "player" })
-            }
-            if(e.oldVersion < 6) {
-                db.deleteObjectStore("nets");
-            },
-            if(e.oldVersion < 7) {
-                db.transaction("data").objectStore("data").clear();
-            }
+            return res();
         }
     });
 
@@ -187,7 +177,27 @@ export const repository = {
             }
         })
     },
-    async getBaseData() {
+    async addData(data: Log[]) {
+        return new Promise((res, rej) => {
+            let transaction = db?.transaction("data", "readwrite");
+            if(!transaction) {
+                return rej("No database");
+            }
+            transaction.onerror = function(e) {
+                return rej(e);
+            }
+            transaction.oncomplete = function(e) {
+                return res();
+            }
+            data.forEach(d => {
+                let request = transaction!.objectStore("data").add(d);
+                request.onerror = function(e) {
+                    return rej(e);
+                }
+            });
+        })
+    },
+    async getBaseData(): Promise<Log[]> {
         return new Promise<Log[]>((res, rej) => {
             let req =  db?.transaction("data").objectStore("data").openCursor();
             let baseData: Log[] = [];
@@ -195,14 +205,14 @@ export const repository = {
                 req.onsuccess = function(e) {
                     let cursor = (<any> e.target)?.result
                     if(cursor) {
-                        let log = plainToClass(Log, cursor.value);
+                        let log = plainToClass(Log, <object> cursor.value);
                         if(!log.player) {
                             baseData.push(log);
                         }
                         cursor.continue();
                     }
                     else {
-                        res(baseData);
+                        return res(baseData);
                     }
                 }
             }
@@ -211,7 +221,7 @@ export const repository = {
             }
         });
     },
-    async getPlayerData(id: string) {
+    async getPlayerData(id: string): Promise<Log[]> {
         return new Promise<Log[]>((res, rej) => {
             let req =  db?.transaction("data").objectStore("data").openCursor();
             let data: Log[] = [];
@@ -219,14 +229,14 @@ export const repository = {
                 req.onsuccess = function(e) {
                     let cursor = (<any> e.target)?.result
                     if(cursor) {
-                        let log = plainToClass(Log, cursor.value);
+                        let log = plainToClass(Log, <object> cursor.value);
                         if(log.player === id) {
                             data.push(log);
                         }
                         cursor.continue();
                     }
                     else {
-                        res(data);
+                        return res(data);
                     }
                 }
             }

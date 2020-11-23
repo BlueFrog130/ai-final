@@ -2,10 +2,10 @@
     <div class="community">
         <div class="row">
             <h3>
-                ${{ board.pot }}
+                Pot: ${{ board.pot }} |
             </h3>
-            <h3 v-if="winnerText">
-                {{ winnerText }}
+            <h3 v-if="winnerText || board.lastAction">
+                {{ winnerText || board.lastAction }}
             </h3>
         </div>
         <div class="row">

@@ -7,19 +7,20 @@
             <card-slot v-for="(c, i) in community" :key="i" :cards="c" flipped />
         </div>
         <div class="row full-width">
-            <button @click="next">Next</button>
+            <button @click="next" :disabled="loading">Next</button>
             <h4>${{ money }}</h4>
-            <button :disabled="!canCheck" @click="submit(actions.Check)">Check</button>
-            <button :disabled="!canCall" @click="submit(actions.Call)">Call ${{ call }}</button>
-            <button :disabled="!canFold" @click="submit(actions.Fold)">Fold</button>
-            <button :disabled="!canBet" @click="submit(actions.Bet)">Bet ${{ amount }}</button>
-            <button :disabled="!canRaise" @click="submit(actions.Raise)">Raise ${{ amount }}</button>
+            <button :disabled="!canCheck || loading" @click="submit(actions.Check)">Check</button>
+            <button :disabled="!canCall || loading" @click="submit(actions.Call)">Call ${{ call }}</button>
+            <button :disabled="!canFold || loading" @click="submit(actions.Fold)">Fold</button>
+            <button :disabled="!canBet || loading" @click="submit(actions.Bet)">Bet ${{ amount }}</button>
+            <button :disabled="!canRaise || loading" @click="submit(actions.Raise)">Raise ${{ amount }}</button>
             <div>
                 <input v-model="amount" type="range" step="100" :min="minRaise" :max="maxRaise">
                 <span class="slider-label">{{ amount }}</span>
             </div>
         </div>
         <h2>{{ solver ? solver.descr : "" }}</h2>
+        <h2>{{ ehs || "loading" }}</h2>
         <close />
     </div>
 </template>
@@ -75,6 +76,10 @@ export default class Trainer extends Vue {
 
     private players = 0;
 
+    private loading = false;
+
+    private ehs = 0;
+
     private get canCheck() {
         return this.currentBet === 0;
     }
@@ -99,7 +104,16 @@ export default class Trainer extends Vue {
         return this.currentBet > this.money ? this.money : this.currentBet;
     }
 
-    private next() {
+    private get normalizedHand() {
+        return this.hand.map(c => c.id);
+    }
+
+    private get normalizedCommunity() {
+        return this.community.map(c => c.id);
+    }
+
+    private async next() {
+        this.loading = true;
         this.money = this.getRandomInt(200, 3000);
         this.currentBet = this.getRandomInt(0, 5) === 0 ? 0 : this.getRandomInt(1, 10) * 100;
         this.deck = new Deck();
@@ -111,7 +125,10 @@ export default class Trainer extends Vue {
         }
         this.minRaise = this.currentBet * 2;
         this.maxRaise = this.money;
-        this.solver = Hand.solve([...this.hand.map(c => c.id), ...this.community.map(c => c.id)]);
+        this.solver = Hand.solve([...this.normalizedHand, ...this.normalizedCommunity]);
+        this.ehs = 0;
+        this.ehs = await this.effectiveHandStrength();
+        this.loading = false;
     }
 
     private getRandomInt(min: number, max: number) {
@@ -125,10 +142,7 @@ export default class Trainer extends Vue {
     }
 
     private async submit(action: Action) {
-        const amount = (this.amount / this.money) > 1 ? 1 : (this.amount / this.money);
-        const currentBet = (this.currentBet / this.money) > 1 ? 1 : (this.currentBet / this.money);
-        const ehs = await this.effectiveHandStrength();
-        let log = new Log({ action, amount, currentBet, ehs });
+        let log = new Log({ action, amount: this.amount, currentBet: this.currentBet, ehs: this.ehs, total: this.money });
         await repository.add(log);
         this.next();
     }
@@ -144,7 +158,7 @@ export default class Trainer extends Vue {
 
     public getHandStrength() {
         return new Promise<number>((resolve, reject) => {
-            this.strengthWorker.postMessage({ hand: this.hand, board: this.community })
+            this.strengthWorker.postMessage({ hand: this.normalizedHand, board: this.normalizedCommunity })
             this.strengthWorker.onmessage = e => {
                 return resolve(Math.pow(e.data, this.players - 1));
             }
@@ -156,7 +170,7 @@ export default class Trainer extends Vue {
 
     public getHandPotential() {
         return new Promise<any>((resolve, reject) => {
-            this.potentialWorker.postMessage({ hand: this.hand, board: this.community })
+            this.potentialWorker.postMessage({ hand: this.normalizedHand, board: this.normalizedCommunity })
             this.potentialWorker.onmessage = e => {
                 return resolve(e.data);
             }
@@ -164,6 +178,11 @@ export default class Trainer extends Vue {
                 return reject(e);
             }
         })
+    }
+
+    private beforeDestroy() {
+        this.strengthWorker.terminate();
+        this.potentialWorker.terminate();
     }
 }
 </script>

@@ -36,7 +36,6 @@ class HandPotential {
      * Worst case for iterations: 1,070,190
      */
     public static async generateHandPotential(hand: string[], board: string[]) {
-        const t0 = performance.now();
         let HP = new HandPotentialTracker();
         const base = [...hand, ...board];
         const ourHand = Hand.solve(base)
@@ -72,8 +71,6 @@ class HandPotential {
         const HPTotal = HandPotentialTracker.totals(HP);
         const PPot = (HP.behind.ahead + HP.behind.tied/2 + HP.tied.ahead/2) / (HPTotal.behind + HPTotal.tied);
         const NPot = (HP.ahead.behind + HP.tied.behind/2 + HP.ahead.tied/2) / (HPTotal.ahead + HPTotal.tied);
-        const t1 = performance.now();
-        console.log(`generating hand potential took ${((t1-t0)/1000)} s`);
         return { PPot, NPot, HPTotal, HP };
     }
 }

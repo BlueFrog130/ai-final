@@ -2,10 +2,10 @@ import { Exclude, plainToClass, Transform, Type } from "class-transformer"
 import { Card } from './card';
 import { Deck } from './deck';
 import { Player } from './player';
-import { Log } from './log';
 import { Action } from './action';
 import * as uuid from "uuid"
 import { Hand } from "pokersolver"
+import { Log } from './log';
 
 const FLOP = 3;
 const TURN = 1;
@@ -77,9 +77,16 @@ export class Board {
 
     public winningDescr = "";
 
-    constructor(opts?: { id: string, players?: Player[], current?: string, state?: number, pot?: number, currentBet?: number, initialized?: boolean, turn?: Turn, round?: number, cards?: Card[], deck?: Deck; }) {
+    public lastAction = "";
+
+    public autoPlay = false;
+
+    private agentPlaying = false;
+
+    constructor(opts?: { id: string, players?: Player[], current?: string, state?: number, pot?: number, currentBet?: number, initialized?: boolean, turn?: Turn, round?: number, cards?: Card[], deck?: Deck; autoPlay: boolean }) {
         if(opts) {
             this.id = opts.id;
+            this.autoPlay = opts.autoPlay;
             if(opts.players) {
                 this.players = opts.players;
                 this.players.forEach((p) => {
@@ -123,10 +130,11 @@ export class Board {
         else {
             this.id = "";
         }
+        this.startAutoPlay();
     }
 
-    public static create() {
-        return new Board({ id: uuid.v4() });
+    public static create(auto = false) {
+        return new Board({ id: uuid.v4(), autoPlay: auto });
     }
 
     public get flopDone() {
@@ -179,7 +187,6 @@ export class Board {
     private dealFlop() {
         if(this.flopDone)
             return;
-        console.log("dealing flop");
         for(let i = 0; i < FLOP; i++) {
             this.add(this.deck.draw());
         }
@@ -188,7 +195,6 @@ export class Board {
     private dealTurn() {
         if(this.turnDone)
             return;
-        console.log("dealing turn");
         for(let i = 0; i < TURN; i++) {
             this.add(this.deck.draw())
         }
@@ -197,7 +203,6 @@ export class Board {
     private dealRiver() {
         if(this.riverDone)
             return;
-        console.log("dealing river");
         for(let i = 0; i < RIVER; i++) {
             this.add(this.deck.draw())
         }
@@ -210,10 +215,6 @@ export class Board {
             this.dealTurn();
         else if(!this.riverDone)
             this.dealRiver();
-    }
-
-    public async deal(ms?: number) {
-        await this.deck.deal(this.players, ms);
     }
 
     private init() {
@@ -252,12 +253,18 @@ export class Board {
     }
 
     private nextPlayer(player: Player | number): Player {
-        let idx = typeof player === "number" ? player : this.findActivePlayerIndex(player);
-        let p = this.activePlayers[(idx + 1) % this.activePlayers.length];
+        let idx = typeof player === "number" ? player : this.findPlayerIndex(player);
+        let p = this.players[(idx + 1) % this.players.length];
+        if(p.folded) {
+            return this.nextPlayer(p);
+        }
         return p;
     }
 
     public startRound() {
+        if(this.state === RoundState.Started) {
+            throw new Error("Cannot start round when already started!");
+        }
         this.round++;
         this.pot = 0;
         this.turn.number = 1;
@@ -288,6 +295,7 @@ export class Board {
         this.currentBet = this.turn.bigBlind.amount;
         this.deck.deal(this.players);
         this.state = RoundState.Started;
+        this.agentPlay();
     }
 
     public nextTurn() {
@@ -298,50 +306,38 @@ export class Board {
             p.playedTurn = false
         });
         this.dealBoard();
+        this.agentPlay();
     }
 
     public action(player: Player, action: Action, amount = 0) {
         if(!player.actions.includes(action)) {
             throw new Error(`Not allowed to ${Action[action]}`);
         }
-        let log = new Log();
-        log.player = player.id;
-        log.currentBet = this.currentBet;
-        log.hand = player.hand.normalized;
-        log.cards = this.normalized;
         switch(action) {
         case Action.Fold:
             player.folded = true;
-            log.action = Action.Fold;
             break;
         case Action.Check:
             // do nothing
-            log.action = Action.Check;
             break;
         case Action.Call:
             player.bet(player.call);
-            log.action = Action.Call;
-            log.amount = player.call;
             break;
         case Action.Raise:
             // Must DOUBLE the bet
             player.bet(amount);
-            this.currentBet = amount;
-            log.action = Action.Raise;
-            log.amount = amount;
+            this.currentBet = Number(amount);
             break;
         case Action.Bet:
             // Cannot be a current bet
             player.bet(amount);
-            this.currentBet = amount;
-            log.action = Action.Bet;
-            log.amount = amount;
+            this.currentBet = Number(amount);
             break;
         }
         player.playedTurn = true;
     }
 
-    public play(action?: { action: Action, amount?: number }) {
+    public play(action?: { action: Action, amount: number, player: Player }) {
         switch(this.state)
         {
             case RoundState.Waiting:
@@ -355,7 +351,15 @@ export class Board {
                     throw new Error("No Current player");
                 if(!action)
                     throw new Error("No action passed");
+                if(action.player !== this.current) {
+                    throw new Error("Current player doesn't match passed player!");
+                }
+                if(action.player.money <= 0 || isNaN(action.player.money)) {
+                    action.player.money = 0;
+                }
                 this.action(this.current, action.action, action.amount);
+
+                this.lastAction = `${this.current.name} - ${Action[action.action]} - $${action.amount}`;
 
                 // Win conditions
                 if(this.activePlayers.length === 1) {
@@ -367,7 +371,13 @@ export class Board {
                     this.winner = [winningIndex];
                     winningPlayer.money += this.pot;
                     this.pot = 0;
+                    this.winningDescr = winningPlayer.solver()?.descr || "";
+                    if(winningPlayer.agent)
+                        winningPlayer.retrain();
                     this.state = RoundState.Finished;
+                    if(this.autoPlay) {
+                        this.startRound();
+                    }
                 }
                 if(this.turnFinished && this.riverDone) {
                     // check for winner
@@ -391,7 +401,16 @@ export class Board {
                     }
                     this.winningDescr = winningHand[0].descr;
                     this.pot = 0;
+                    this.winner.forEach(v => {
+                        const player = this.getPlayer(v);
+                        if(player.agent) {
+                            player.retrain();
+                        }
+                    })
                     this.state = RoundState.Finished;
+                    if(this.autoPlay) {
+                        this.startRound();
+                    }
                 }
 
                 // Start next turn
@@ -400,8 +419,32 @@ export class Board {
                     if(this.turnFinished) {
                         this.nextTurn();
                     }
+                    else {
+                        this.agentPlay();
+                    }
                 }
                 break;
+        }
+    }
+
+    private agentPlay() {
+        if(this.current && this.current.agent && !this.agentPlaying) {
+            console.log(`triggering agent play ${this.current.name}`);
+            this.agentPlaying = true;
+            const agent = this.current;
+            this.current.getAction().then(r => {
+                this.agentPlaying = false;
+                this.play({ player: agent, action: r.action, amount: r.amount });
+            })
+        }
+    }
+
+    public startAutoPlay() {
+        if(this.players.length > 0 && this.autoPlay && this.state !== RoundState.Started) {
+            this.startRound();
+        }
+        if(this.state === RoundState.Started) {
+            this.agentPlay();
         }
     }
 }
