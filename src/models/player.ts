@@ -160,6 +160,7 @@ export class Player {
             this.train();
         }
         this.initalizing = false;
+        console.log(this.net);
     }
 
     /**
